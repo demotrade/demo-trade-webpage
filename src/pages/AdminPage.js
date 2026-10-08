@@ -152,25 +152,30 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
             </div>
           </div>
 
-          <!-- COVER IMAGE UPLOAD BOX -->
-          <div style="background: var(--gray-100); border: 2px dashed var(--gray-300); border-radius: var(--radius-md); padding: 1.5rem; text-align: center; margin-bottom: 1.5rem;">
+          <!-- COVER IMAGE UPLOAD BOX (FILE ONLY, NO URL) -->
+          <div style="background: var(--gray-100); border: 2px dashed var(--gray-300); border-radius: var(--radius-md); padding: 1.8rem; text-align: center; margin-bottom: 1.5rem;">
             <div style="font-weight: 700; color: var(--dark); font-size: 1.05rem; margin-bottom: 0.4rem;">
-              <i class="fa-solid fa-cloud-arrow-up" style="color: var(--primary); font-size: 1.6rem; display: block; margin: 0 auto 0.4rem;"></i>
-              Borítókép (Feltöltés a számítógépről vagy URL)
+              <i class="fa-solid fa-cloud-arrow-up" style="color: var(--primary); font-size: 1.8rem; display: block; margin: 0 auto 0.5rem;"></i>
+              Borítókép Feltöltése a Számítógépről
             </div>
-            <p style="color: var(--gray-600); font-size: 0.88rem; margin-bottom: 1rem;">
-              Töltsön fel képet a számítógépről, vagy válasszon meglévő URL-t!
+            <p style="color: var(--gray-600); font-size: 0.88rem; margin-bottom: 1.2rem;">
+              Válasszon ki egy képet a számítógépéről (JPG, PNG, WebP). A rendszer automatikusan optimalizálja.
             </p>
             
-            <div style="display: flex; gap: 1rem; align-items: center; justify-content: center; flex-wrap: wrap;">
-              <input type="file" id="post-image-file" class="form-control" accept="image/*" style="max-width: 320px; background: #ffffff;" />
-              <span style="color: var(--gray-500); font-weight: 700;">VAGY URL:</span>
-              <input type="text" id="post-image" class="form-control" placeholder="/images/gyumolcsfa_oltvanyok.jpg vagy https://..." value="${editingPost ? editingPost.image : '/images/gyumolcsfa_oltvanyok.jpg'}" style="max-width: 380px; background: #ffffff;" required />
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.8rem;">
+              <label for="post-image-file" class="btn btn-outline" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1.6rem; background: #fff;">
+                <i class="fa-solid fa-folder-open" style="color: var(--primary);"></i> Fájl Kiválasztása...
+              </label>
+              <input type="file" id="post-image-file" accept="image/*" style="display: none;" />
+              <input type="hidden" id="post-image" value="${editingPost ? editingPost.image : (currentType === 'product' ? '/images/gyumolcsfa_oltvanyok.jpg' : (currentType === 'career' ? '/images/karrier_csapat.jpg' : '/images/hero.png'))}" />
+              <div id="post-image-filename" style="font-size: 0.85rem; color: var(--gray-600); font-weight: 500;">
+                ${editingPost && editingPost.image ? 'Jelenlegi kép beállítva' : 'Nincs új fájl kiválasztva (alapértelmezett kép lesz használva, ha nem tölt fel újat)'}
+              </div>
             </div>
 
             <div id="post-image-preview-container" style="margin-top: 1.2rem; ${editingPost && editingPost.image ? '' : 'display: none;'}">
-              <span style="font-size: 0.85rem; color: var(--gray-600); display: block; margin-bottom: 0.4rem; font-weight: 600;">Borítókép előnézete:</span>
-              <img id="post-image-preview" src="${editingPost ? editingPost.image : ''}" style="max-height: 140px; border-radius: var(--radius-md); box-shadow: var(--shadow-md); border: 2px solid #ffffff; object-fit: cover;" />
+              <span style="font-size: 0.85rem; color: var(--gray-600); display: block; margin-bottom: 0.4rem; font-weight: 600;">Kép előnézete:</span>
+              <img id="post-image-preview" src="${editingPost ? editingPost.image : ''}" style="max-height: 160px; max-width: 100%; border-radius: var(--radius-md); box-shadow: var(--shadow-md); border: 2px solid #ffffff; object-fit: contain; background: #fff;" />
             </div>
           </div>
 

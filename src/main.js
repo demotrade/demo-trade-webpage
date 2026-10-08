@@ -14,6 +14,7 @@ import { renderImpresszumPage } from './pages/ImpresszumPage.js';
 import { renderPrivacyPage } from './pages/PrivacyPage.js';
 import { renderNotFoundPage } from './pages/NotFoundPage.js';
 import { renderCookieBanner } from './components/CookieBanner.js';
+import { supabase } from './utils/supabaseClient.js';
 
 // --- STATE MANAGEMENT ---
 let state = {
@@ -37,6 +38,24 @@ const STAGING_DEV_PASSWORD = 'MoRa!b18jA';
 
 function isStagingUnlocked() {
   return sessionStorage.getItem('demotrade_preview_unlocked') === 'true' || state.isLoggedIn;
+}
+
+// Background sync from Supabase Pro database
+async function syncPostsFromSupabase() {
+  try {
+    const { data, error } = await supabase
+      .from('web_posts')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      state.posts = data;
+      localStorage.setItem('demotrade_posts', JSON.stringify(data));
+      render();
+    }
+  } catch (err) {
+    console.warn('Supabase posts sync info (fallback to cache):', err);
+  }
 }
 
 function loadPosts() {
@@ -78,9 +97,32 @@ function loadPosts() {
   return INITIAL_POSTS;
 }
 
-function savePosts(posts) {
+function savePosts(posts, postToSync = null) {
   state.posts = posts;
   localStorage.setItem('demotrade_posts', JSON.stringify(posts));
+
+  // Sync with Supabase Pro Database if post provided
+  if (postToSync) {
+    supabase.from('web_posts').upsert({
+      id: postToSync.id,
+      type: postToSync.type || 'blog',
+      title: postToSync.title,
+      category: postToSync.category,
+      author: postToSync.author,
+      date: postToSync.date,
+      image: postToSync.image,
+      excerpt: postToSync.excerpt,
+      content: postToSync.content,
+      location: postToSync.location || null,
+      jobType: postToSync.jobType || null,
+      deadline: postToSync.deadline || null,
+      price: postToSync.price || null,
+      badge: postToSync.badge || null,
+      updated_at: new Date().toISOString()
+    }).then(({ error }) => {
+      if (error) console.warn('Supabase post upsert notice:', error.message);
+    });
+  }
 }
 
 function showToast(message, type = 'success') {
@@ -1358,11 +1400,45 @@ function attachEventListeners() {
 
 
 
-  // Admin File Upload for Cover Image (Vercel Base64 compatible)
+  // Helper: Client-side Image Compression (Canvas resize & JPEG quality)
+  const compressImageFile = (file, maxWidth = 1200, quality = 0.82) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          if (height > maxWidth) {
+            width = Math.round((width * maxWidth) / height);
+            height = maxWidth;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressedDataUrl);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Admin File Upload for Cover Image (Only file upload, auto-optimized)
   const imageFileInput = document.getElementById('post-image-file');
   const imageUrlInput = document.getElementById('post-image');
   const imagePreviewCont = document.getElementById('post-image-preview-container');
   const imagePreview = document.getElementById('post-image-preview');
+  const imageFilenameEl = document.getElementById('post-image-filename');
 
   if (imageFileInput && imageUrlInput) {
     const updatePreview = (src) => {
@@ -1376,21 +1452,32 @@ function attachEventListeners() {
       }
     };
 
-    imageFileInput.addEventListener('change', (e) => {
+    imageFileInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          imageUrlInput.value = evt.target.result;
-          updatePreview(evt.target.result);
-          showToast('Kép sikeresen betöltve a bejegyzéshez!');
-        };
-        reader.readAsDataURL(file);
+        if (imageFilenameEl) imageFilenameEl.textContent = 'Kép feldolgozása és optimalizálása...';
+        try {
+          const optimizedDataUrl = await compressImageFile(file, 1200, 0.82);
+          imageUrlInput.value = optimizedDataUrl;
+          updatePreview(optimizedDataUrl);
+          const sizeKb = Math.round((optimizedDataUrl.length * 0.75) / 1024);
+          if (imageFilenameEl) {
+            imageFilenameEl.innerHTML = `<span style="color: var(--primary); font-weight: 700;"><i class="fa-solid fa-circle-check"></i> ${file.name}</span> (~${sizeKb} KB, optimalizálva)`;
+          }
+          showToast('Kép sikeresen optimalizálva és betöltve!');
+        } catch (err) {
+          console.error('Image compression error:', err);
+          // Fallback to direct FileReader
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            imageUrlInput.value = evt.target.result;
+            updatePreview(evt.target.result);
+            if (imageFilenameEl) imageFilenameEl.textContent = file.name;
+            showToast('Kép sikeresen betöltve!');
+          };
+          reader.readAsDataURL(file);
+        }
       }
-    });
-
-    imageUrlInput.addEventListener('input', (e) => {
-      updatePreview(e.target.value.trim());
     });
   }
 
@@ -1444,18 +1531,26 @@ function attachEventListeners() {
         editorFileInput.click();
       });
 
-      editorFileInput.addEventListener('change', (e) => {
+      editorFileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) {
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            const base64 = evt.target.result;
+          try {
+            const optimizedBase64 = await compressImageFile(file, 1000, 0.80);
             editorArea.focus();
-            document.execCommand('insertHTML', false, `<img src="${base64}" alt="Cikk kép" style="max-width:100%; height:auto; border-radius:8px; margin: 1.5rem 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />`);
-            showToast('Kép beillesztve a leírásba!');
-            editorFileInput.value = '';
-          };
-          reader.readAsDataURL(file);
+            document.execCommand('insertHTML', false, `<img src="${optimizedBase64}" alt="Cikk kép" style="max-width:100%; height:auto; border-radius:8px; margin: 1.5rem 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />`);
+            showToast('Kép optimalizálva és beillesztve a leírásba!');
+          } catch (err) {
+            console.error('Editor image error:', err);
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+              const base64 = evt.target.result;
+              editorArea.focus();
+              document.execCommand('insertHTML', false, `<img src="${base64}" alt="Cikk kép" style="max-width:100%; height:auto; border-radius:8px; margin: 1.5rem 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />`);
+              showToast('Kép beillesztve a leírásba!');
+            };
+            reader.readAsDataURL(file);
+          }
+          editorFileInput.value = '';
         }
       });
     }
@@ -2022,17 +2117,17 @@ function attachEventListeners() {
     });
   });
 
-  // Admin form submission (Add / Edit) with Type & Extras
+  // Admin form submission (Add / Edit) with Type & Extras + Supabase Pro Sync
   const adminForm = document.getElementById('admin-post-form');
   if (adminForm) {
-    adminForm.addEventListener('submit', (e) => {
+    adminForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const id = document.getElementById('post-id')?.value;
       const type = document.querySelector('input[name="post-type"]:checked')?.value || 'blog';
       const title = document.getElementById('post-title')?.value.trim();
       const category = document.getElementById('post-category')?.value.trim() || 'Híreink';
       const author = document.getElementById('post-author')?.value.trim() || 'Moravszki Gábor';
-      const image = document.getElementById('post-image')?.value.trim() || (type === 'product' ? '/images/gyumolcsfa_oltvanyok.jpg' : (type === 'career' ? '/images/karrier_csapat.jpg' : '/images/hero.png'));
+      let image = document.getElementById('post-image')?.value.trim() || (type === 'product' ? '/images/gyumolcsfa_oltvanyok.jpg' : (type === 'career' ? '/images/karrier_csapat.jpg' : '/images/hero.png'));
       const excerpt = document.getElementById('post-excerpt')?.value.trim();
       const content = editorArea ? editorArea.innerHTML.trim() : document.getElementById('post-content')?.value.trim();
       const date = new Date().toLocaleDateString('hu-HU');
@@ -2049,10 +2144,34 @@ function attachEventListeners() {
         return;
       }
 
+      // If a new image was selected (base64 data URL), upload it to Supabase Pro Storage
+      if (image && image.startsWith('data:image')) {
+        showToast('Kép feltöltése a Supabase felhőtárhelyre...', 'info');
+        try {
+          const upRes = await fetch('/api/upload-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: image,
+              filename: title || 'post-image',
+              folder: type === 'product' ? 'termekek' : (type === 'career' ? 'karrier' : 'blog')
+            })
+          });
+          const upData = await upRes.json();
+          if (upRes.ok && upData.success && upData.publicUrl) {
+            image = upData.publicUrl;
+          }
+        } catch (upErr) {
+          console.warn('Image upload to Supabase notice (fallback to local data):', upErr);
+        }
+      }
+
+      let savedPostObj = null;
+
       if (id) {
         const updatedPosts = state.posts.map(p => {
           if (p.id === id) {
-            return {
+            savedPostObj = {
               ...p,
               type,
               title,
@@ -2067,14 +2186,15 @@ function attachEventListeners() {
               price,
               badge
             };
+            return savedPostObj;
           }
           return p;
         });
-        savePosts(updatedPosts);
-        showToast('Tartalom sikeresen frissítve!');
+        savePosts(updatedPosts, savedPostObj);
+        showToast('Tartalom sikeresen frissítve a Supabase felhőben!');
       } else {
         const prefix = type === 'career' ? 'job-' : (type === 'product' ? 'prod-' : 'post-');
-        const newPost = {
+        savedPostObj = {
           id: prefix + Date.now(),
           type,
           title,
@@ -2090,8 +2210,8 @@ function attachEventListeners() {
           price,
           badge
         };
-        savePosts([newPost, ...state.posts]);
-        showToast('Új bejegyzés sikeresen közzétéve!');
+        savePosts([savedPostObj, ...state.posts], savedPostObj);
+        showToast('Új bejegyzés sikeresen közzétéve a Supabase felhőben!');
       }
 
       state.editingPostId = null;
@@ -2117,13 +2237,19 @@ function attachEventListeners() {
     });
   }
 
-  // Admin Delete button
+  // Admin Delete button (Syncs with Supabase)
   document.querySelectorAll('.delete-post-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-id');
       if (confirm('Biztosan törölni szeretné ezt a bejegyzést?')) {
         const filtered = state.posts.filter(p => p.id !== id);
         savePosts(filtered);
+
+        // Delete from Supabase
+        supabase.from('web_posts').delete().eq('id', id).then(({ error }) => {
+          if (error) console.warn('Supabase delete notice:', error.message);
+        });
+
         showToast('Bejegyzés törölve!');
         if (state.editingPostId === id) state.editingPostId = null;
         render();
@@ -2192,3 +2318,4 @@ function attachEventListeners() {
 // Initial render
 initHistoryState();
 render();
+syncPostsFromSupabase();
