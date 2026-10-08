@@ -18,6 +18,8 @@ export function renderFooter() {
               <li><a href="#" data-page="home">Főoldal</a></li>
               <li><a href="#" data-page="home" data-section="rolunk">Rólunk</a></li>
               <li><a href="#" data-page="home" data-section="szolgaltatasok">Szolgáltatások</a></li>
+              <li><a href="#" data-page="products">Termékek</a></li>
+              <li><a href="#" data-page="career">Karrier</a></li>
               <li><a href="#" data-page="blog">Blog &amp; Hírek</a></li>
               <li><a href="#" data-page="home" data-section="kapcsolat">Kapcsolat</a></li>
               <li><a href="#" data-page="privacy" style="color: var(--gray-400);">Adatkezelési tájékoztató</a></li>
@@ -50,7 +52,7 @@ export function renderFooter() {
             <a href="#" id="footer-cookie-btn">
               <i class="fa-solid fa-cookie-bite"></i> Sütik
             </a>
-            <a href="#" id="footer-admin-btn">
+            <a href="#admin" data-page="admin" id="footer-admin-btn">
               <i class="fa-solid fa-lock"></i> Admin
             </a>
           </div>

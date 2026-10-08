@@ -27,6 +27,12 @@ export function renderHeader(activePage, searchValue = '') {
           <li class="nav-item">
             <button data-page="home" data-section="szolgaltatasok"><i class="fa-solid fa-gears"></i> Szolgáltatások</button>
           </li>
+          <li class="nav-item ${activePage === 'products' ? 'active' : ''}">
+            <button data-page="products"><i class="fa-solid fa-apple-whole"></i> Termékek</button>
+          </li>
+          <li class="nav-item ${activePage === 'career' ? 'active' : ''}">
+            <button data-page="career"><i class="fa-solid fa-briefcase"></i> Karrier</button>
+          </li>
           <li class="nav-item ${activePage === 'blog' ? 'active' : ''}">
             <button data-page="blog"><i class="fa-solid fa-newspaper"></i> Blog &amp; Hírek</button>
           </li>

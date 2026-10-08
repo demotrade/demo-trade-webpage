@@ -7,6 +7,8 @@ import { renderAboutPage } from './pages/AboutPage.js';
 import { renderServicesPage } from './pages/ServicesPage.js';
 import { renderBlogPage } from './pages/BlogPage.js';
 import { renderContactPage } from './pages/ContactPage.js';
+import { renderCareerPage } from './pages/CareerPage.js';
+import { renderProductsPage } from './pages/ProductsPage.js';
 import { renderAdminPage } from './pages/AdminPage.js';
 import { renderImpresszumPage } from './pages/ImpresszumPage.js';
 import { renderPrivacyPage } from './pages/PrivacyPage.js';
@@ -23,14 +25,51 @@ let state = {
   selectedCategory: 'all',
   currentPage: 1,
   editingPostId: null,
-  isLoggedIn: false
+  isLoggedIn: sessionStorage.getItem('demotrade_admin_logged_in') === 'true',
+  productCategory: 'all',
+  productSearch: '',
+  activeProductId: null,
+  adminTableFilter: 'all',
+  selectedCvAttachment: null
 };
+
+const STAGING_DEV_PASSWORD = 'MoRa!b18jA';
+
+function isStagingUnlocked() {
+  return sessionStorage.getItem('demotrade_preview_unlocked') === 'true' || state.isLoggedIn;
+}
 
 function loadPosts() {
   const saved = localStorage.getItem('demotrade_posts');
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      const todayDate = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\s/g, '');
+      const careerItem = parsed.find(p => p.id === 'karrier-mezogazdasagi-szaktanacsado');
+      if (careerItem && careerItem.date !== todayDate) {
+        careerItem.date = todayDate;
+        localStorage.setItem('demotrade_posts', JSON.stringify(parsed));
+      }
+
+      // Ensure initial career and fruit tree sapling product entries are present
+      const hasCareer = parsed.some(p => p.id === 'karrier-mezogazdasagi-szaktanacsado');
+      const hasNewSaplings = parsed.some(p => p.id === 'oltvany-gala-must-alma');
+      if (!hasCareer || !hasNewSaplings) {
+        const filtered = parsed.filter(p => 
+          p.id !== 'karrier-szaktanacsado-novenyorvos' && 
+          p.id !== 'karrier-mezogazdasagi-szaktanacsado' &&
+          p.id !== 'termek-gyumolcsfa-oltvanyok' &&
+          p.id !== 'termek-fagyvedelmi-kondicionalok'
+        );
+        const initialCareer = INITIAL_POSTS.filter(p => p.type === 'career');
+        const initialProducts = INITIAL_POSTS.filter(p => p.type === 'product');
+        const userProducts = filtered.filter(p => p.type === 'product' && !INITIAL_POSTS.some(ip => ip.id === p.id));
+        const nonProductsNonCareer = filtered.filter(p => p.type !== 'product' && p.type !== 'career');
+        const merged = [...initialCareer, ...initialProducts, ...userProducts, ...nonProductsNonCareer];
+        localStorage.setItem('demotrade_posts', JSON.stringify(merged));
+        return merged;
+      }
+      return parsed;
     } catch (e) {
       console.error('Error loading posts from localStorage:', e);
     }
@@ -235,6 +274,24 @@ const STATIC_SEARCH_ITEMS = [
     text: 'A Demo-Trade Kft. adatkezelési szabályzata, cookie tájékoztató és letölthető hivatalos PDF dokumentum.',
     targetPage: 'privacy',
     targetElementId: null
+  },
+  {
+    id: 'career-info',
+    category: 'Karrier',
+    icon: 'fa-solid fa-briefcase',
+    title: 'Karrier - Álláslehetőségek & Jelentkezés',
+    text: 'Csatlakozzon agrár szaktanácsadói és növényorvosi csapatunkhoz. Aktuális nyitott pozíciók és online önéletrajz beküldés.',
+    targetPage: 'career',
+    targetElementId: null
+  },
+  {
+    id: 'products-info',
+    category: 'Termékek',
+    icon: 'fa-solid fa-apple-whole',
+    title: 'Termékek - Gyümölcsfa Oltványok & Növénykondicionálók',
+    text: 'Vírusmentes minősített alma, cseresznye, meggy és szilva oltványok, valamint professzionális növényvédelmi anyagok.',
+    targetPage: 'products',
+    targetElementId: null
   }
 ];
 
@@ -245,20 +302,29 @@ function render() {
   let mainContent = '';
   switch (state.activePage) {
     case 'home':
-      mainContent = renderHomePage(state.posts);
+      mainContent = renderHomePage(state.posts.filter(p => !p.type || p.type === 'blog'));
       break;
     case 'about':
       // Rólunk is on homepage section
       state.activePage = 'home';
-      mainContent = renderHomePage(state.posts);
+      mainContent = renderHomePage(state.posts.filter(p => !p.type || p.type === 'blog'));
       break;
     case 'services':
       // Szolgáltatások is on homepage section
       state.activePage = 'home';
-      mainContent = renderHomePage(state.posts);
+      mainContent = renderHomePage(state.posts.filter(p => !p.type || p.type === 'blog'));
+      break;
+    case 'career':
+    case 'karrier':
+    case 'allas':
+      mainContent = renderCareerPage(state.posts);
+      break;
+    case 'products':
+    case 'termekek':
+      mainContent = renderProductsPage(state.posts, state.productCategory, state.productSearch, state.activeProductId);
       break;
     case 'blog':
-      mainContent = renderBlogPage(state.posts, state.activePostId, state.searchTerm, state.selectedCategory, state.currentPage);
+      mainContent = renderBlogPage(state.posts.filter(p => !p.type || p.type === 'blog'), state.activePostId, state.searchTerm, state.selectedCategory, state.currentPage);
       break;
     case 'contact':
       mainContent = renderContactPage();
@@ -271,13 +337,76 @@ function render() {
       mainContent = renderPrivacyPage();
       break;
     case 'admin':
-      mainContent = renderAdminPage(state.posts, state.isLoggedIn, state.editingPostId);
+      mainContent = renderAdminPage(state.posts, state.isLoggedIn, state.editingPostId, state.adminTableFilter);
       break;
     case 'not-found':
       mainContent = renderNotFoundPage();
       break;
     default:
       mainContent = renderNotFoundPage();
+  }
+
+  const isGatedPage = ['career', 'karrier', 'allas', 'allashirdetes', 'products', 'termekek', 'oltvanyok'].includes(state.activePage);
+  const stagingUnlocked = isStagingUnlocked();
+
+  let stagingHtml = '';
+  if (isGatedPage) {
+    if (!stagingUnlocked) {
+      document.body.style.overflow = 'hidden';
+      stagingHtml = `
+        <div class="staging-gate-overlay" id="staging-gate-overlay">
+          <div class="staging-gate-card">
+            <div class="staging-icon">
+              <i class="fa-solid fa-person-digging"></i>
+            </div>
+            <div class="staging-badge">
+              <i class="fa-solid fa-lock"></i> Előkészület alatt
+            </div>
+            <h2>Az oldal még kialakítás alatt van, nézzen vissza később!</h2>
+            <p>
+              Ezen a menüponton jelenleg a legfrissebb információk feltöltése és szakmai előkészítése zajlik. Hamarosan elérhetővé válik minden látogatónk számára!
+            </p>
+
+            <div style="display: flex; gap: 0.8rem; justify-content: center; margin-bottom: 1.5rem;">
+              <button type="button" class="btn btn-primary" id="staging-back-home-btn">
+                <i class="fa-solid fa-house"></i> Vissza a Főoldalra
+              </button>
+            </div>
+
+            <div class="staging-dev-box">
+              <div class="staging-dev-title">
+                <i class="fa-solid fa-key"></i> Fejlesztői teszt hozzáférés
+              </div>
+              <form class="staging-form" id="staging-unlock-form">
+                <input 
+                  type="password" 
+                  id="staging-password-input" 
+                  class="form-control" 
+                  placeholder="Fejlesztői jelszó..." 
+                  autocomplete="current-password"
+                  required 
+                />
+                <button type="submit" class="btn btn-outline" style="white-space: nowrap;">
+                  <i class="fa-solid fa-unlock"></i> Feloldás
+                </button>
+              </form>
+              <div id="staging-error-msg" style="display: none; color: #dc2626; font-size: 0.85rem; margin-top: 0.6rem; font-weight: 600;">
+                <i class="fa-solid fa-circle-exclamation"></i> Helytelen fejlesztői jelszó! Próbálja újra.
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      document.body.style.overflow = '';
+      stagingHtml = `
+        <div class="dev-unlocked-floating-badge" id="dev-lock-again-btn" title="Kattintson ide a fejlesztői előnézet újrazárolásához">
+          <i class="fa-solid fa-unlock-keyhole"></i> Fejlesztői előnézet aktív &bull; Zárolás
+        </div>
+      `;
+    }
+  } else {
+    document.body.style.overflow = '';
   }
 
   app.innerHTML = `
@@ -287,6 +416,7 @@ function render() {
     </main>
     ${renderFooter()}
     ${renderCookieBanner()}
+    ${stagingHtml}
   `;
 
   attachEventListeners();
@@ -513,6 +643,13 @@ function initHistoryState() {
       'rolunk': 'home',
       'services': 'home',
       'szolgaltatasok': 'home',
+      'career': 'career',
+      'karrier': 'career',
+      'allas': 'career',
+      'allashirdetes': 'career',
+      'products': 'products',
+      'termekek': 'products',
+      'oltvanyok': 'products',
       'blog': 'blog',
       'hirek': 'blog',
       'contact': 'contact',
@@ -560,6 +697,13 @@ function initHistoryState() {
     'rolunk': 'home',
     'services': 'home',
     'szolgaltatasok': 'home',
+    'career': 'career',
+    'karrier': 'career',
+    'allas': 'career',
+    'allashirdetes': 'career',
+    'products': 'products',
+    'termekek': 'products',
+    'oltvanyok': 'products',
     'blog': 'blog',
     'hirek': 'blog',
     'contact': 'contact',
@@ -587,12 +731,13 @@ window.addEventListener('popstate', (e) => {
     return;
   }
 
-  if (e.state && e.state.page) {
-    state.activePage = e.state.page;
-    state.activePostId = e.state.postId || null;
-  } else {
-    initHistoryState();
-  }
+  initHistoryState();
+  render();
+  window.scrollTo(0, 0);
+});
+
+window.addEventListener('hashchange', () => {
+  initHistoryState();
   render();
   window.scrollTo(0, 0);
 });
@@ -788,7 +933,7 @@ function attachEventListeners() {
   if (footerAdminBtn) {
     footerAdminBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      state.activePage = 'admin';
+      setPageState('admin', null, true);
       render();
       window.scrollTo(0, 0);
     });
@@ -868,21 +1013,45 @@ function attachEventListeners() {
                normalizeStr(item.category).includes(normalizedQuery);
       });
 
-      // 2. Search in blog posts
+      // 2. Search in posts / career / products
       const matchedPosts = state.posts.filter(post => {
         return normalizeStr(post.title).includes(normalizedQuery) ||
                normalizeStr(post.excerpt).includes(normalizedQuery) ||
                normalizeStr(post.content).includes(normalizedQuery) ||
                normalizeStr(post.category).includes(normalizedQuery);
-      }).map(post => ({
-        id: `post-${post.id}`,
-        category: 'Blog cikk',
-        icon: 'fa-solid fa-newspaper',
-        title: post.title,
-        text: post.excerpt,
-        targetPage: 'blog',
-        postId: post.id
-      }));
+      }).map(post => {
+        const type = post.type || 'blog';
+        if (type === 'career') {
+          return {
+            id: `job-${post.id}`,
+            category: 'Karrier / Állás',
+            icon: 'fa-solid fa-briefcase',
+            title: post.title,
+            text: post.excerpt,
+            targetPage: 'career',
+            postId: post.id
+          };
+        } else if (type === 'product') {
+          return {
+            id: `prod-${post.id}`,
+            category: 'Termékek & Oltványok',
+            icon: 'fa-solid fa-apple-whole',
+            title: post.title,
+            text: post.excerpt,
+            targetPage: 'products',
+            postId: post.id
+          };
+        }
+        return {
+          id: `post-${post.id}`,
+          category: 'Blog cikk',
+          icon: 'fa-solid fa-newspaper',
+          title: post.title,
+          text: post.excerpt,
+          targetPage: 'blog',
+          postId: post.id
+        };
+      });
 
       const allMatches = [...matchedStatic, ...matchedPosts];
 
@@ -944,6 +1113,20 @@ function attachEventListeners() {
             state.menuSearchTerm = '';
             render();
             window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else if (targetPage === 'products' && postId) {
+            state.activeProductId = postId;
+            setPageState('products', null, true);
+            state.menuSearchTerm = '';
+            render();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else if (targetPage === 'career' && postId) {
+            setPageState('career', null, true);
+            state.menuSearchTerm = '';
+            render();
+            setTimeout(() => {
+              const el = document.getElementById(`job-${postId}`);
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
           } else {
             executeTargetNavigation(targetPage, targetElement);
           }
@@ -970,6 +1153,8 @@ function attachEventListeners() {
       const pass = document.getElementById('admin-password').value;
       if (pass === 'MoRa!b18jA') {
         state.isLoggedIn = true;
+        sessionStorage.setItem('demotrade_admin_logged_in', 'true');
+        setPageState('admin', null, true);
         showToast('Sikeres belépés az Admin Panelre!');
         render();
       } else {
@@ -983,6 +1168,8 @@ function attachEventListeners() {
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
       state.isLoggedIn = false;
+      sessionStorage.removeItem('demotrade_admin_logged_in');
+      setPageState('home', null, true);
       showToast('Kijelentkezve.');
       render();
     });
@@ -1228,6 +1415,28 @@ function attachEventListeners() {
       });
     });
 
+    // Format Block (H2, H3, H4, p) dropdown handler
+    const formatSelect = document.getElementById('editor-format-select');
+    if (formatSelect) {
+      formatSelect.addEventListener('change', (e) => {
+        const tag = e.target.value;
+        document.execCommand('formatBlock', false, `<${tag}>`);
+        editorArea.focus();
+      });
+    }
+
+    // Font Size (1-7) dropdown handler
+    const fontSizeSelect = document.getElementById('editor-fontsize-select');
+    if (fontSizeSelect) {
+      fontSizeSelect.addEventListener('change', (e) => {
+        const size = e.target.value;
+        if (size) {
+          document.execCommand('fontSize', false, size);
+        }
+        editorArea.focus();
+      });
+    }
+
     const insertImgBtn = document.getElementById('editor-insert-img-btn');
     if (insertImgBtn && editorFileInput) {
       insertImgBtn.addEventListener('click', (e) => {
@@ -1243,7 +1452,7 @@ function attachEventListeners() {
             const base64 = evt.target.result;
             editorArea.focus();
             document.execCommand('insertHTML', false, `<img src="${base64}" alt="Cikk kép" style="max-width:100%; height:auto; border-radius:8px; margin: 1.5rem 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />`);
-            showToast('Kép beillesztve a cikkbe!');
+            showToast('Kép beillesztve a leírásba!');
             editorFileInput.value = '';
           };
           reader.readAsDataURL(file);
@@ -1252,39 +1461,634 @@ function attachEventListeners() {
     }
   }
 
-  // Admin form submission (Add / Edit)
+  // ==========================================
+  // CAREER PAGE EVENT HANDLERS
+  // ==========================================
+  // 1. "Jelentkezés" button on job cards -> scroll & preselect
+  document.querySelectorAll('.apply-to-job-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const jobTitle = btn.getAttribute('data-job-title');
+      const select = document.getElementById('career-position');
+      if (select && jobTitle) {
+        let found = false;
+        for (let i = 0; i < select.options.length; i++) {
+          if (select.options[i].value === jobTitle) {
+            select.selectedIndex = i;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          const opt = new Option(jobTitle, jobTitle, true, true);
+          select.add(opt);
+        }
+      }
+
+      const formSection = document.getElementById('karrier-jelentkezes');
+      if (formSection) {
+        const yOffset = -70;
+        const y = formSection.getBoundingClientRect().top + window.pageYOffset + yOffset;
+        window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+      }
+    });
+  });
+
+  // 2. CV File dropzone handling
+  const cvDropzone = document.getElementById('cv-dropzone');
+  const cvFileInput = document.getElementById('career-cv-file');
+  const dropzonePrompt = document.getElementById('dropzone-prompt');
+  const dropzoneFileInfo = document.getElementById('dropzone-file-info');
+  const cvFilename = document.getElementById('cv-filename');
+  const cvFilesize = document.getElementById('cv-filesize');
+  const removeCvBtn = document.getElementById('remove-cv-btn');
+
+  if (cvDropzone && cvFileInput) {
+    cvDropzone.addEventListener('click', (e) => {
+      if (e.target.closest('#remove-cv-btn')) return;
+      cvFileInput.click();
+    });
+
+    const handleFile = (file) => {
+      if (!file) return;
+
+      const validExts = ['.pdf', '.doc', '.docx'];
+      const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      if (!validExts.includes(fileExt)) {
+        showToast('Kérjük csak PDF vagy Word (.doc, .docx) formátumú önéletrajzot töltsön fel!', 'error');
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        showToast('A fájl mérete nem haladhatja meg a 10 MB-ot!', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        // extract base64 data
+        const base64Data = evt.target.result.split(',')[1];
+        state.selectedCvAttachment = {
+          filename: file.name,
+          content: base64Data,
+          contentType: file.type || 'application/pdf'
+        };
+
+        if (cvFilename) cvFilename.textContent = file.name;
+        if (cvFilesize) {
+          const sizeKb = (file.size / 1024).toFixed(1);
+          cvFilesize.textContent = sizeKb > 1024 ? `${(sizeKb / 1024).toFixed(2)} MB` : `${sizeKb} KB`;
+        }
+
+        if (dropzonePrompt) dropzonePrompt.style.display = 'none';
+        if (dropzoneFileInfo) dropzoneFileInfo.style.display = 'flex';
+        showToast('Önéletrajz csatolva!');
+      };
+      reader.readAsDataURL(file);
+    };
+
+    cvFileInput.addEventListener('change', (e) => {
+      handleFile(e.target.files[0]);
+    });
+
+    cvDropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      cvDropzone.classList.add('dragover');
+    });
+
+    cvDropzone.addEventListener('dragleave', () => {
+      cvDropzone.classList.remove('dragover');
+    });
+
+    cvDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      cvDropzone.classList.remove('dragover');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    if (removeCvBtn) {
+      removeCvBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.selectedCvAttachment = null;
+        cvFileInput.value = '';
+        if (dropzonePrompt) dropzonePrompt.style.display = 'block';
+        if (dropzoneFileInfo) dropzoneFileInfo.style.display = 'none';
+      });
+    }
+  }
+
+  // 3. Career Application Form submission
+  const careerForm = document.getElementById('career-application-form');
+  if (careerForm) {
+    careerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const name = document.getElementById('career-name')?.value.trim();
+      const email = document.getElementById('career-email')?.value.trim();
+      const phone = document.getElementById('career-phone')?.value.trim();
+      const position = document.getElementById('career-position')?.value;
+      const message = document.getElementById('career-message')?.value.trim();
+      const privacy = document.getElementById('career-privacy')?.checked;
+      const honeypot = document.getElementById('career-hp-fax')?.value.trim();
+      const submitBtn = document.getElementById('career-submit-btn');
+
+      if (honeypot) {
+        console.warn('Bot detected via honeypot.');
+        showToast('Köszönjük! Jelentkezését sikeresen rögzítettük!');
+        careerForm.reset();
+        return;
+      }
+
+      if (!privacy) {
+        showToast('Kérjük fogadja el az Adatkezelési tájékoztatót a jelentkezéshez!', 'error');
+        return;
+      }
+
+      if (!name || !email || !message) {
+        showToast('Kérjük töltse ki a kötelező mezőket!', 'error');
+        return;
+      }
+
+      if (!state.selectedCvAttachment) {
+        showToast('Kérjük csatolja fényképes szakmai önéletrajzát!', 'error');
+        return;
+      }
+
+      const origBtnText = submitBtn ? submitBtn.innerHTML : 'Jelentkezés Beküldése';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Jelentkezés és önéletrajz küldése...';
+      }
+
+      try {
+        const response = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'career',
+            name,
+            email,
+            phone,
+            position,
+            message,
+            attachment: state.selectedCvAttachment,
+            privacyConsent: true
+          })
+        });
+
+        const result = await response.json();
+        if (response.ok && result.success) {
+          showToast(result.message || 'Köszönjük! Jelentkezését és önéletrajzát sikeresen továbbítottuk!');
+          careerForm.reset();
+          state.selectedCvAttachment = null;
+          if (dropzonePrompt) dropzonePrompt.style.display = 'block';
+          if (dropzoneFileInfo) dropzoneFileInfo.style.display = 'none';
+        } else {
+          showToast(result.message || 'Hiba történt a jelentkezés küldésekor.', 'error');
+        }
+      } catch (err) {
+        console.error('Career submit error:', err);
+        showToast('Köszönjük! Jelentkezését rögzítettük és hamarosan felvesszük Önnel a kapcsolatot!', 'success');
+        careerForm.reset();
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = origBtnText;
+        }
+      }
+    });
+  }
+
+  // ==========================================
+  // PRODUCTS PAGE EVENT HANDLERS
+  // ==========================================
+  // Category pills filter
+  document.querySelectorAll('.product-category-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      state.productCategory = pill.getAttribute('data-prod-cat');
+      render();
+    });
+  });
+
+  // Product search live input
+  const prodSearchInput = document.getElementById('product-search-input');
+  if (prodSearchInput) {
+    prodSearchInput.addEventListener('input', (e) => {
+      state.productSearch = e.target.value;
+      render();
+      const input = document.getElementById('product-search-input');
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    });
+  }
+
+  // Reset filter button
+  const resetProdFilterBtn = document.getElementById('reset-prod-filter-btn');
+  if (resetProdFilterBtn) {
+    resetProdFilterBtn.addEventListener('click', () => {
+      state.productCategory = 'all';
+      state.productSearch = '';
+      render();
+    });
+  }
+
+  // Product Detail Modal Open
+  document.querySelectorAll('.view-product-modal-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const prodId = btn.getAttribute('data-prod-id');
+      state.activeProductId = prodId;
+      render();
+    });
+  });
+
+  // Product Detail Modal Close
+  const closeProdModalBtn = document.getElementById('close-product-modal-btn');
+  const dismissProdModalBtn = document.getElementById('dismiss-product-modal-btn');
+  const prodDetailModal = document.getElementById('product-detail-modal');
+
+  const closeProductDetailModal = () => {
+    state.activeProductId = null;
+    render();
+  };
+
+  if (closeProdModalBtn) closeProdModalBtn.addEventListener('click', closeProductDetailModal);
+  if (dismissProdModalBtn) dismissProdModalBtn.addEventListener('click', closeProductDetailModal);
+  if (prodDetailModal) {
+    prodDetailModal.addEventListener('click', (e) => {
+      if (e.target === prodDetailModal) closeProductDetailModal();
+    });
+  }
+
+  // Product Quick Inquiry Modal
+  const inquiryModal = document.getElementById('product-inquiry-modal');
+  const closeInquiryModalBtn = document.getElementById('close-inquiry-modal-btn');
+  const cancelInquiryBtn = document.getElementById('cancel-inquiry-btn');
+  const inquiryModalTitle = document.getElementById('inquiry-modal-title');
+  const inquiryProdNameInput = document.getElementById('inquiry-product-name');
+
+  document.querySelectorAll('.open-product-inquiry-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const prodTitle = btn.getAttribute('data-prod-title');
+      if (inquiryModal) {
+        if (inquiryModalTitle) inquiryModalTitle.textContent = `Ajánlatkérés: ${prodTitle}`;
+        if (inquiryProdNameInput) inquiryProdNameInput.value = prodTitle;
+        inquiryModal.style.display = 'flex';
+      }
+    });
+  });
+
+  const closeInquiryModal = () => {
+    if (inquiryModal) inquiryModal.style.display = 'none';
+  };
+
+  if (closeInquiryModalBtn) closeInquiryModalBtn.addEventListener('click', closeInquiryModal);
+  if (cancelInquiryBtn) cancelInquiryBtn.addEventListener('click', closeInquiryModal);
+  if (inquiryModal) {
+    inquiryModal.addEventListener('click', (e) => {
+      if (e.target === inquiryModal) closeInquiryModal();
+    });
+  }
+
+  // Product Inquiry Form Submit
+  const inquiryForm = document.getElementById('product-inquiry-form');
+  if (inquiryForm) {
+    inquiryForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('inquiry-name')?.value.trim();
+      const email = document.getElementById('inquiry-email')?.value.trim();
+      const phone = document.getElementById('inquiry-phone')?.value.trim();
+      const productName = inquiryProdNameInput?.value || 'Általános termék';
+      const message = document.getElementById('inquiry-message')?.value.trim();
+      const submitBtn = document.getElementById('inquiry-submit-btn');
+
+      if (!name || !email || !message) {
+        showToast('Kérjük töltse ki a kötelező mezőket!', 'error');
+        return;
+      }
+
+      const origBtnText = submitBtn ? submitBtn.innerHTML : 'Ajánlatkérés Küldése';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Küldés folyamatban...';
+      }
+
+      try {
+        const response = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'product',
+            name,
+            email,
+            phone,
+            productName,
+            message,
+            privacyConsent: true
+          })
+        });
+
+        const result = await response.json();
+        if (response.ok && result.success) {
+          showToast(result.message || 'Köszönjük érdeklődését! Ajánlatkérését sikeresen elküldtük!');
+          inquiryForm.reset();
+          closeInquiryModal();
+        } else {
+          showToast(result.message || 'Hiba történt a küldéskor.', 'error');
+        }
+      } catch (err) {
+        console.error('Inquiry error:', err);
+        showToast('Köszönjük! Érdeklődését továbbítottuk, hamarosan visszahívjuk!', 'success');
+        closeInquiryModal();
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = origBtnText;
+        }
+      }
+    });
+  }
+
+  // ==========================================
+  // ADMIN PANEL ENHANCED EVENT HANDLERS
+  // ==========================================
+  // Content Type Selector Toggle in Admin Form
+  document.querySelectorAll('input[name="post-type"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const type = e.target.value;
+      document.querySelectorAll('.type-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.querySelector('input').value === type);
+      });
+
+      const careerFields = document.getElementById('career-extra-fields');
+      const prodFields = document.getElementById('product-extra-fields');
+      const titleLabel = document.getElementById('label-post-title');
+      const titleInput = document.getElementById('post-title');
+      const catInput = document.getElementById('post-category');
+
+      if (careerFields) careerFields.style.display = type === 'career' ? 'grid' : 'none';
+      if (prodFields) prodFields.style.display = type === 'product' ? 'grid' : 'none';
+
+      if (titleLabel && titleInput) {
+        if (type === 'career') {
+          titleLabel.textContent = 'Pozíció Megnevezése *';
+          titleInput.placeholder = 'Pl. Mezőgazdasági Szaktanácsadó...';
+          if (!catInput.value || catInput.value === 'Híreink') catInput.value = 'Szaktanácsadás';
+        } else if (type === 'product') {
+          titleLabel.textContent = 'Termék / Oltvány Neve *';
+          titleInput.placeholder = 'Pl. Jonagold Alma Oltvány (M9)...';
+          if (!catInput.value || catInput.value === 'Híreink') catInput.value = 'Gyümölcsfa oltványok';
+        } else {
+          titleLabel.textContent = 'Cikk Címe *';
+          titleInput.placeholder = 'Pl. Növényvédelmi előrejelzés...';
+          if (!catInput.value) catInput.value = 'Híreink';
+        }
+      }
+    });
+  });
+
+  // Admin Table Filter Pills
+  document.querySelectorAll('.admin-filter-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.adminTableFilter = btn.getAttribute('data-filter');
+      render();
+    });
+  });
+
+  // Admin Live Preview Modal Handlers (Előkép / Megtekintési lehetőség)
+  const previewModal = document.getElementById('admin-preview-modal');
+  const previewPostBtn = document.getElementById('preview-post-btn');
+  const closeAdminPreviewBtn = document.getElementById('close-admin-preview-btn');
+  const dismissAdminPreviewBtn = document.getElementById('dismiss-admin-preview-btn');
+  const publishFromPreviewBtn = document.getElementById('publish-from-preview-btn');
+
+  const openAdminPreview = (customPost = null) => {
+    if (!previewModal) return;
+
+    let title, type, category, author, image, excerpt, content, metaExtra = '';
+
+    if (customPost) {
+      title = customPost.title;
+      type = customPost.type || 'blog';
+      category = customPost.category || 'Általános';
+      author = customPost.author || 'Demo-Trade Kft.';
+      image = customPost.image || '/images/hero.png';
+      excerpt = customPost.excerpt || '';
+      content = customPost.content || '';
+      if (type === 'career') {
+        metaExtra = `${customPost.location || ''} &bull; ${customPost.jobType || ''}`;
+      } else if (type === 'product') {
+        metaExtra = `${customPost.price || ''} &bull; ${customPost.badge || ''}`;
+      }
+    } else {
+      title = document.getElementById('post-title')?.value.trim() || 'Cím nélküli tartalom';
+      type = document.querySelector('input[name="post-type"]:checked')?.value || 'blog';
+      category = document.getElementById('post-category')?.value.trim() || 'Kategória';
+      author = document.getElementById('post-author')?.value.trim() || 'Moravszki Gábor';
+      image = document.getElementById('post-image')?.value.trim() || (type === 'product' ? '/images/gyumolcsfa_oltvanyok.jpg' : (type === 'career' ? '/images/karrier_csapat.jpg' : '/images/hero.png'));
+      excerpt = document.getElementById('post-excerpt')?.value.trim() || '';
+      content = editorArea ? editorArea.innerHTML.trim() : document.getElementById('post-content')?.value.trim();
+
+      if (type === 'career') {
+        const loc = document.getElementById('job-location')?.value.trim();
+        const jType = document.getElementById('job-type-field')?.value.trim();
+        metaExtra = [loc, jType].filter(Boolean).join(' &bull; ');
+      } else if (type === 'product') {
+        const pr = document.getElementById('prod-price')?.value.trim();
+        const bg = document.getElementById('prod-badge')?.value.trim();
+        metaExtra = [pr, bg].filter(Boolean).join(' &bull; ');
+      }
+    }
+
+    const typeBadge = document.getElementById('preview-modal-type-badge');
+    const customTop = document.getElementById('preview-modal-custom-top');
+    const customBottom = document.getElementById('preview-modal-custom-bottom');
+
+    if (customTop) customTop.innerHTML = '';
+    if (customBottom) customBottom.innerHTML = '';
+
+    if (typeBadge) {
+      if (type === 'career') {
+        typeBadge.className = 'admin-type-badge badge-career';
+        typeBadge.innerHTML = '<i class="fa-solid fa-briefcase"></i> Álláshirdetés Előnézet';
+
+        if (customTop) {
+          const loc = document.getElementById('job-location')?.value.trim() || 'Nyíregyháza';
+          const jType = document.getElementById('job-type-field')?.value.trim() || 'Teljes munkaidő';
+          const dLine = document.getElementById('job-deadline')?.value.trim() || 'Folyamatos felvétel';
+          customTop.innerHTML = `
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1rem 1.4rem; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; font-size: 0.9rem;">
+              <span><i class="fa-solid fa-location-dot" style="color: var(--primary);"></i> <strong>Helyszín:</strong> ${loc}</span>
+              <span><i class="fa-regular fa-clock" style="color: var(--primary);"></i> <strong>Munkaidő:</strong> ${jType}</span>
+              <span><i class="fa-regular fa-calendar-check" style="color: var(--primary);"></i> <strong>Határidő:</strong> ${dLine}</span>
+            </div>
+          `;
+        }
+
+        if (customBottom) {
+          customBottom.innerHTML = `
+            <div style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 1.2rem 1.5rem; text-align: center; color: var(--gray-600); font-size: 0.9rem;">
+              <i class="fa-solid fa-file-arrow-up" style="color: var(--primary); font-size: 1.4rem; display: block; margin-bottom: 0.4rem;"></i>
+              <strong>Beépített Jelentkezési Űrlap Minta:</strong> A látogatók ezen hirdetés alatt közvetlenül tudják majd feltölteni szakmai önéletrajzukat és elküldeni pályázatukat a rendszeren keresztül.
+            </div>
+          `;
+        }
+      } else if (type === 'product') {
+        typeBadge.className = 'admin-type-badge badge-product';
+        typeBadge.innerHTML = '<i class="fa-solid fa-apple-whole"></i> Termékhirdetés Előnézet';
+
+        if (customTop) {
+          const pr = document.getElementById('prod-price')?.value.trim() || 'Egyedi árajánlat alapján';
+          const bg = document.getElementById('prod-badge')?.value.trim() || 'Minősített Oltvány';
+          customTop.innerHTML = `
+            <div style="background: #fff7ed; border: 1px solid #ffedd5; border-radius: 8px; padding: 1.2rem 1.4rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+              <div>
+                <span class="product-badge-overlay" style="position: static; display: inline-block; margin-bottom: 0.4rem;">${bg}</span>
+                <div style="font-size: 1.3rem; font-weight: 800; color: #c2410c;">
+                  <i class="fa-solid fa-tag"></i> ${pr}
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary" style="pointer-events: none; opacity: 0.9;">
+                <i class="fa-solid fa-paper-plane"></i> Ajánlatkérés a termékről (Vásárlói Gomb)
+              </button>
+            </div>
+          `;
+        }
+      } else {
+        typeBadge.className = 'admin-type-badge badge-blog';
+        typeBadge.innerHTML = '<i class="fa-solid fa-newspaper"></i> Blog Cikk Előnézet';
+      }
+    }
+
+    const titleEl = document.getElementById('preview-modal-title');
+    if (titleEl) titleEl.textContent = title;
+
+    const metaEl = document.getElementById('preview-modal-meta');
+    if (metaEl) {
+      metaEl.innerHTML = `<span><strong>${category}</strong> &bull; ${author} &bull; ${metaExtra}</span>`;
+    }
+
+    const imgEl = document.getElementById('preview-modal-img');
+    if (imgEl) imgEl.src = image;
+
+    const excerptBox = document.getElementById('preview-modal-excerpt-box');
+    if (excerptBox) {
+      excerptBox.textContent = excerpt || '(Nincs rövid kivonat megadva)';
+    }
+
+    const contentRich = document.getElementById('preview-modal-content-rich');
+    if (contentRich) {
+      contentRich.innerHTML = content || '<p><em>Nincs részletes tartalom megadva.</em></p>';
+    }
+
+    previewModal.style.display = 'flex';
+  };
+
+  if (previewPostBtn) {
+    previewPostBtn.addEventListener('click', () => openAdminPreview());
+  }
+
+  const closeAdminPreview = () => {
+    if (previewModal) previewModal.style.display = 'none';
+  };
+
+  if (closeAdminPreviewBtn) closeAdminPreviewBtn.addEventListener('click', closeAdminPreview);
+  if (dismissAdminPreviewBtn) dismissAdminPreviewBtn.addEventListener('click', closeAdminPreview);
+  if (previewModal) {
+    previewModal.addEventListener('click', (e) => {
+      if (e.target === previewModal) closeAdminPreview();
+    });
+  }
+
+  if (publishFromPreviewBtn) {
+    publishFromPreviewBtn.addEventListener('click', () => {
+      closeAdminPreview();
+      const adminForm = document.getElementById('admin-post-form');
+      if (adminForm) {
+        adminForm.requestSubmit ? adminForm.requestSubmit() : adminForm.submit();
+      }
+    });
+  }
+
+  // Preview button in admin table rows
+  document.querySelectorAll('.preview-item-table-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      const item = state.posts.find(p => p.id === id);
+      if (item) openAdminPreview(item);
+    });
+  });
+
+  // Admin form submission (Add / Edit) with Type & Extras
   const adminForm = document.getElementById('admin-post-form');
   if (adminForm) {
     adminForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const id = document.getElementById('post-id').value;
-      const title = document.getElementById('post-title').value.trim();
-      const category = document.getElementById('post-category').value;
-      const author = document.getElementById('post-author').value.trim();
-      const image = document.getElementById('post-image').value.trim() || '/images/hero.png';
-      const excerpt = document.getElementById('post-excerpt').value.trim();
-      const content = editorArea ? editorArea.innerHTML.trim() : document.getElementById('post-content').value.trim();
+      const id = document.getElementById('post-id')?.value;
+      const type = document.querySelector('input[name="post-type"]:checked')?.value || 'blog';
+      const title = document.getElementById('post-title')?.value.trim();
+      const category = document.getElementById('post-category')?.value.trim() || 'Híreink';
+      const author = document.getElementById('post-author')?.value.trim() || 'Moravszki Gábor';
+      const image = document.getElementById('post-image')?.value.trim() || (type === 'product' ? '/images/gyumolcsfa_oltvanyok.jpg' : (type === 'career' ? '/images/karrier_csapat.jpg' : '/images/hero.png'));
+      const excerpt = document.getElementById('post-excerpt')?.value.trim();
+      const content = editorArea ? editorArea.innerHTML.trim() : document.getElementById('post-content')?.value.trim();
       const date = new Date().toLocaleDateString('hu-HU');
 
+      // Type-specific extras
+      const location = document.getElementById('job-location')?.value.trim();
+      const jobType = document.getElementById('job-type-field')?.value.trim();
+      const deadline = document.getElementById('job-deadline')?.value.trim();
+      const price = document.getElementById('prod-price')?.value.trim();
+      const badge = document.getElementById('prod-badge')?.value.trim();
+
       if (!content || content === '<br>') {
-        showToast('Kérjük adja meg a cikk teljes szövegét!', 'error');
+        showToast('Kérjük adja meg a részletes szöveges leírást!', 'error');
         return;
       }
 
       if (id) {
-        const updatedPosts = state.posts.map(p => p.id === id ? { ...p, title, category, author, image, excerpt, content } : p);
+        const updatedPosts = state.posts.map(p => {
+          if (p.id === id) {
+            return {
+              ...p,
+              type,
+              title,
+              category,
+              author,
+              image,
+              excerpt,
+              content,
+              location,
+              jobType,
+              deadline,
+              price,
+              badge
+            };
+          }
+          return p;
+        });
         savePosts(updatedPosts);
-        showToast('Bejegyzés sikeresen frissítve!');
+        showToast('Tartalom sikeresen frissítve!');
       } else {
+        const prefix = type === 'career' ? 'job-' : (type === 'product' ? 'prod-' : 'post-');
         const newPost = {
-          id: 'post-' + Date.now(),
+          id: prefix + Date.now(),
+          type,
           title,
           category,
           author,
           date,
           image,
           excerpt,
-          content
+          content,
+          location,
+          jobType,
+          deadline,
+          price,
+          badge
         };
         savePosts([newPost, ...state.posts]);
         showToast('Új bejegyzés sikeresen közzétéve!');
@@ -1331,20 +2135,60 @@ function attachEventListeners() {
   const resetBtn = document.getElementById('reset-posts-btn');
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
-      if (confirm('Visszaállítja a gyári demo cikkeket?')) {
+      if (confirm('Visszaállítja a gyári demo cikkeket, állásokat és termékeket?')) {
         savePosts(INITIAL_POSTS);
         state.editingPostId = null;
-        showToast('Demo bejegyzések visszaállítva!');
+        showToast('Alapértelmezett bejegyzések és termékek visszaállítva!');
         render();
       }
+    });
+  }
+
+  // --- STAGING GATE VEIL EVENT LISTENERS ---
+  const stagingBackHomeBtn = document.getElementById('staging-back-home-btn');
+  if (stagingBackHomeBtn) {
+    stagingBackHomeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.body.style.overflow = '';
+      setPageState('home', null, true);
+      render();
+      window.scrollTo(0, 0);
+    });
+  }
+
+  const stagingUnlockForm = document.getElementById('staging-unlock-form');
+  if (stagingUnlockForm) {
+    stagingUnlockForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const pwInput = document.getElementById('staging-password-input');
+      const errBox = document.getElementById('staging-error-msg');
+      const val = pwInput ? pwInput.value.trim() : '';
+
+      if (val === STAGING_DEV_PASSWORD) {
+        sessionStorage.setItem('demotrade_preview_unlocked', 'true');
+        showToast('Fejlesztői hozzáférés feloldva!');
+        render();
+      } else {
+        if (errBox) errBox.style.display = 'block';
+        if (pwInput) {
+          pwInput.classList.add('error');
+          pwInput.focus();
+          pwInput.select();
+        }
+      }
+    });
+  }
+
+  const devLockAgainBtn = document.getElementById('dev-lock-again-btn');
+  if (devLockAgainBtn) {
+    devLockAgainBtn.addEventListener('click', () => {
+      sessionStorage.removeItem('demotrade_preview_unlocked');
+      showToast('Fejlesztői előnézet zárolva.');
+      render();
     });
   }
 }
 
 // Initial render
 initHistoryState();
-document.addEventListener('DOMContentLoaded', () => {
-  initHistoryState();
-  render();
-});
 render();
