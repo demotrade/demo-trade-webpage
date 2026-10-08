@@ -49,9 +49,17 @@ async function syncPostsFromSupabase() {
       .order('created_at', { ascending: false });
 
     if (!error && data && data.length > 0) {
+      // Compare content signatures to detect if database data ACTUALLY changed
+      const currentSignature = (state.posts || []).map(p => `${p.id}_${p.updated_at || p.date}_${p.title}`).join('|');
+      const incomingSignature = data.map(p => `${p.id}_${p.updated_at || p.date}_${p.title}`).join('|');
+
       state.posts = data;
       localStorage.setItem('demotrade_posts', JSON.stringify(data));
-      render();
+
+      // ONLY re-render if the database content differs from current loaded posts
+      if (currentSignature !== incomingSignature) {
+        render();
+      }
     }
   } catch (err) {
     console.warn('Supabase posts sync info (fallback to cache):', err);
