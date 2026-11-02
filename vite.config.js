@@ -326,6 +326,95 @@ export default defineConfig({
             res.end();
           }
         });
+
+        // Meta Facebook Graph API Middleware for local dev
+        server.middlewares.use('/api/facebook-post', async (req, res) => {
+          if (req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk.toString(); });
+            req.on('end', async () => {
+              try {
+                const { message, imageUrl, linkUrl, published = true } = JSON.parse(body);
+
+                if (!message || message.trim() === '') {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  return res.end(JSON.stringify({ success: false, message: 'A Facebook poszt szövege nem lehet üres!' }));
+                }
+
+                const FB_PAGE_ID = process.env.FB_PAGE_ID;
+                const FB_PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+
+                // Szimulált mód ha nincs token beállítva
+                if (!FB_PAGE_ID || !FB_PAGE_ACCESS_TOKEN) {
+                  res.statusCode = 200;
+                  res.setHeader('Content-Type', 'application/json');
+                  return res.end(JSON.stringify({
+                    success: true,
+                    isSimulated: true,
+                    message: 'Szimulált Facebook közzététel sikeres! (Helyi fejlesztési módban a rendszer ellenőrizte az adatokat, token nélkül szimulált választ küld.)',
+                    postId: 'simulated_' + Date.now(),
+                    postUrl: 'https://www.facebook.com/demotradekft'
+                  }));
+                }
+
+                let graphUrl = '';
+                let bodyPayload = {};
+
+                if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+                  graphUrl = `https://graph.facebook.com/v19.0/${FB_PAGE_ID}/photos`;
+                  bodyPayload = {
+                    url: imageUrl,
+                    caption: message + (linkUrl ? `\n\n👉 Bővebben a weboldalunkon:\n${linkUrl}` : ''),
+                    published: published,
+                    access_token: FB_PAGE_ACCESS_TOKEN
+                  };
+                } else {
+                  graphUrl = `https://graph.facebook.com/v19.0/${FB_PAGE_ID}/feed`;
+                  bodyPayload = {
+                    message: message,
+                    link: linkUrl || undefined,
+                    published: published,
+                    access_token: FB_PAGE_ACCESS_TOKEN
+                  };
+                }
+
+                const fbRes = await fetch(graphUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(bodyPayload)
+                });
+                const fbData = await fbRes.json();
+
+                if (!fbRes.ok || fbData.error) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  return res.end(JSON.stringify({
+                    success: false,
+                    message: `Facebook hiba: ${fbData.error?.message || 'Nem sikerült közzétenni a posztot.'}`,
+                    error: fbData.error
+                  }));
+                }
+
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({
+                  success: true,
+                  message: 'A bejegyzés sikeresen megjelent a Facebook oldalon!',
+                  postId: fbData.id || fbData.post_id,
+                  postUrl: `https://www.facebook.com/${fbData.id || fbData.post_id}`
+                }));
+              } catch (err) {
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, message: 'Szerverhiba: ' + err.message }));
+              }
+            });
+          } else {
+            res.statusCode = 405;
+            res.end();
+          }
+        });
       }
     }
   ]

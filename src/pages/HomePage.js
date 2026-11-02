@@ -184,6 +184,17 @@ export function renderHomePage(posts) {
               <h3>Mezőgazdasági szaktanácsadás</h3>
             </div>
             <p>A gazdálkodást segítő információk átadásán túl számos szolgáltatással segítjük a gazdálkodókat.</p>
+            <ul style="display: none;" aria-hidden="true">
+              <li>Egységes kérelmek beadása</li>
+              <li>Gazdálkodási napló folyamatos vezetése és elektronikus benyújtása (e-GN)</li>
+              <li>Nitrátjelentés készítése és elektronikus benyújtása</li>
+              <li>Tápanyag-gazdálkodási terv készítése</li>
+              <li>Agrárkárenyhítés kapcsán káresemények bejelentése és elszámolása</li>
+              <li>Gázolaj jövedéki adó visszaigénylés</li>
+              <li>Kamarai tagdíjbevallás</li>
+              <li>Földhasználati terv készítése</li>
+              <li>Monitoring adatszolgáltatás készítése</li>
+            </ul>
 
             <button class="btn btn-outline open-service-modal" data-service-idx="0" style="margin-top: auto; width: 100%;">
               <i class="fa-solid fa-circle-info"></i> Részletes feladatok
@@ -197,6 +208,12 @@ export function renderHomePage(posts) {
               <h3>Növényvédelmi tanácsadás</h3>
             </div>
             <p>A növényvédelmi biolabor üzemeltetése, meteorológiai állomások, növényvédelmi előrejelzéseken túl heti hírlevéllel segítjük a munkát.</p>
+            <ul style="display: none;" aria-hidden="true">
+              <li>Növényvédelmi biolabor üzemeltetése</li>
+              <li>Meteorológiai állomások adatai és elemzései</li>
+              <li>Növényvédelmi előrejelzés</li>
+              <li>Hírlevelek heti rendszerességgel</li>
+            </ul>
 
             <button class="btn btn-outline open-service-modal" data-service-idx="1" style="margin-top: auto; width: 100%;">
               <i class="fa-solid fa-circle-info"></i> Részletes feladatok
@@ -210,6 +227,11 @@ export function renderHomePage(posts) {
               <h3>Mezőgazdasági jellegű pályázatok</h3>
             </div>
             <p>A pályázatok figyelése, pályázatok készítése és menedzselése is feladataink közé tartozik.</p>
+            <ul style="display: none;" aria-hidden="true">
+              <li>Fiatal gazda pályázatok</li>
+              <li>Öntözési fejlesztési pályázatok</li>
+              <li>Gépbeszerzéses és technológiai pályázatok</li>
+            </ul>
 
             <button class="btn btn-outline open-service-modal" data-service-idx="2" style="margin-top: auto; width: 100%;">
               <i class="fa-solid fa-circle-info"></i> Elérhető pályázati típusok
@@ -223,6 +245,10 @@ export function renderHomePage(posts) {
               <h3>Permetezőgépek műszaki felülvizsgálata</h3>
             </div>
             <p>Mobil vizsgaállomásunkkal a permetezőgépek időszakos műszaki felülvizsgálatában is ügyfeleink rendelkezésére állunk.</p>
+            <ul style="display: none;" aria-hidden="true">
+              <li>Mobil vizsgaállomás üzemeltetése helyszíni méréssel</li>
+              <li>Az árutermelésben és szolgáltatásban használt permetezőgépek időszakos műszaki felülvizsgálata</li>
+            </ul>
 
             <button class="btn btn-outline open-service-modal" data-service-idx="3" style="margin-top: auto; width: 100%;">
               <i class="fa-solid fa-circle-info"></i> Részletek a felülvizsgálatról

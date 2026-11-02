@@ -15,15 +15,15 @@ export function renderFooter() {
           <div class="footer-links">
             <h4>Navigáció</h4>
             <ul>
-              <li><a href="#" data-page="home">Főoldal</a></li>
-              <li><a href="#" data-page="home" data-section="rolunk">Rólunk</a></li>
-              <li><a href="#" data-page="home" data-section="szolgaltatasok">Szolgáltatások</a></li>
-              <li><a href="#" data-page="products">Termékek</a></li>
-              <li><a href="#" data-page="career">Karrier</a></li>
-              <li><a href="#" data-page="blog">Blog &amp; Hírek</a></li>
-              <li><a href="#" data-page="home" data-section="kapcsolat">Kapcsolat</a></li>
-              <li><a href="#" data-page="privacy" style="color: var(--gray-400);">Adatkezelési tájékoztató</a></li>
-              <li><a href="#" data-page="impresszum" style="color: var(--gray-400);">Impresszum</a></li>
+              <li><a href="/" data-page="home">Főoldal</a></li>
+              <li><a href="/rolunk" data-page="home" data-section="rolunk">Rólunk</a></li>
+              <li><a href="/szolgaltatasok" data-page="home" data-section="szolgaltatasok">Szolgáltatások</a></li>
+              <li><a href="/termekek" data-page="products">Termékek</a></li>
+              <li><a href="/karrier" data-page="career">Karrier</a></li>
+              <li><a href="/hirek" data-page="blog">Blog &amp; Hírek</a></li>
+              <li><a href="/kapcsolat" data-page="home" data-section="kapcsolat">Kapcsolat</a></li>
+              <li><a href="/adatkezeles" data-page="privacy" style="color: var(--gray-400);">Adatkezelési tájékoztató</a></li>
+              <li><a href="/impresszum" data-page="impresszum" style="color: var(--gray-400);">Impresszum</a></li>
             </ul>
           </div>
 
@@ -47,8 +47,8 @@ export function renderFooter() {
             design by: <a href="https://www.rekalaca-webdesign.hu/" target="_blank" rel="noopener">rekalaca-webdesign</a>
           </div>
           <div class="footer-bottom-links">
-            <a href="#" data-page="privacy">Adatkezelés</a>
-            <a href="#" data-page="impresszum">Impresszum</a>
+            <a href="/adatkezeles" data-page="privacy">Adatkezelés</a>
+            <a href="/impresszum" data-page="impresszum">Impresszum</a>
             <a href="#" id="footer-cookie-btn">
               <i class="fa-solid fa-cookie-bite"></i> Sütik
             </a>
@@ -57,6 +57,14 @@ export function renderFooter() {
             </a>
           </div>
         </div>
+        <address style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; font-style: normal;">
+          Demo-Trade Kft. – Akkreditált Uniós Mezőgazdasági Szaktanácsadási Központ (alapítva: 2007, ügyvezető: Moravszki Gábor mezőgazdasági szaktanácsadó, növényorvos, irodavezető: Sápi Imre).
+          Irodák: 4400 Nyíregyháza, Lengyel utca 15. és Bethlen Gábor utca 32.; Kisvárdai Területi Iroda; 4931 Tarpa, Kossuth út 25/C. ép.
+          Telefon: +36 30 346 2848, +36 30 559 7376. E-mail: demotradekft@gmail.com. Adószám: 14901832-2-15. Cégjegyzékszám: 15-09-074844.
+          Lefedettség: Szabolcs-Szatmár-Bereg, Hajdú-Bihar és Borsod-Abaúj-Zemplén vármegye (550+ szerződött gazdálkodó).
+          Szolgáltatások: Egységes kérelmek (EK), e-GN gazdálkodási napló, e-permetezési napló, nitrátjelentés, tápanyag-gazdálkodási terv, agrárkárenyhítés (fagykár, aszálykár), gázolaj jövedéki adó visszaigénylés, NAK kamarai tagdíjbevallás, növényvédelmi biolabor és előrejelzés, mezőgazdasági pályázatírás, permetezőgépek kötelező műszaki felülvizsgálata mobil vizsgaállomással.
+          Termékek: Vírusmentes minősített gyümölcsfa oltványok – Gala Must alma (2.890 Ft/db), Bigarreau Burlat cseresznye (3.190 Ft/db), Čačanska Lepotica szilva (2.790 Ft/db), Ceglédi Óriás kajszibarack (3.290 Ft/db).
+        </address>
       </div>
     </footer>
   `;

@@ -472,6 +472,61 @@ function render() {
   attachEventListeners();
   initScrollObserver();
   initParallaxScroll();
+  updatePageSeoMeta();
+}
+
+function updatePageSeoMeta() {
+  const baseUrl = 'https://demotradekft.hu';
+  let title = 'Demo-Trade Kft. | Mezőgazdasági Szaktanácsadási Központ - Nyíregyháza, Kisvárda, Tarpa';
+  let description = 'Akkreditált Uniós Mezőgazdasági Szaktanácsadási Központ Nyíregyházán, Kisvárdán és Tarpán. 550+ gazdálkodó szakmai támogatása Szabolcs-Szatmár-Bereg, Hajdú-Bihar és Borsod-Abaúj-Zemplén vármegyében: agrárpályázatok, növényvédelem, e-GN gazdálkodási napló, nitrátjelentés, permetezőgép felülvizsgálat és minősített gyümölcsfa oltványok.';
+  let canonicalUrl = `${baseUrl}/`;
+
+  if (state.activePage === 'blog') {
+    if (state.activePostId) {
+      const post = (state.posts || []).find(p => p.id === state.activePostId);
+      if (post) {
+        title = `${post.title} | Demo-Trade Kft. Szaktanácsadás`;
+        description = (post.excerpt || description).replace(/<[^>]*>/g, '').slice(0, 260);
+        canonicalUrl = `${baseUrl}/#blog/${post.id}`;
+      }
+    } else {
+      title = 'Agrár Hírek & Növényvédelmi Előrejelzések | Demo-Trade Kft.';
+      description = 'Heti növényvédelmi előrejelzések, fagyvédelmi szaktanácsok, agrárpályázati hírek és jogszabályi változások a Demo-Trade Kft. szakértőitől.';
+      canonicalUrl = `${baseUrl}/hirek`;
+    }
+  } else if (state.activePage === 'products' || state.activePage === 'termekek') {
+    title = 'Gyümölcsfa Oltványok & Mezőgazdasági Termékek | Demo-Trade Kft.';
+    description = 'Vírusmentes, I. osztályú minősített gyümölcsfa oltványok (Gala Must alma, Bigarreau Burlat cseresznye, Čačanska Lepotica szilva, Ceglédi Óriás kajszi) és ültetvénytelepítési szaktanácsadás.';
+    canonicalUrl = `${baseUrl}/termekek`;
+  } else if (state.activePage === 'career' || state.activePage === 'karrier') {
+    title = 'Karrier & Nyitott Pozíciók – Mezőgazdasági Szaktanácsadó | Demo-Trade Kft.';
+    description = 'Csatlakozzon a Demo-Trade Kft. akkreditált mezőgazdasági szaktanácsadói és növényorvosi csapatához Nyíregyházán vagy Kisvárdán!';
+    canonicalUrl = `${baseUrl}/karrier`;
+  } else if (state.activePage === 'contact') {
+    title = 'Kapcsolat & Területi Irodák (Nyíregyháza, Kisvárda, Tarpa) | Demo-Trade Kft.';
+    description = 'Vegye fel a kapcsolatot a Demo-Trade Kft. nyíregyházi központi, valamint kisvárdai és tarpai területi irodáinak szaktanácsadóival és növényorvosaival!';
+    canonicalUrl = `${baseUrl}/kapcsolat`;
+  } else if (state.activePage === 'impresszum') {
+    title = 'Impresszum & Cégadatok | Demo-Trade Kft.';
+    description = 'A Demo-Trade Kft. hivatalos cégadatai, székhelyei (Nyíregyháza, Tarpa), adószáma és szaktanácsadó munkatársainak elérhetőségei.';
+    canonicalUrl = `${baseUrl}/impresszum`;
+  } else if (state.activePage === 'privacy' || state.activePage === 'adatkezeles') {
+    title = 'Adatkezelési Tájékoztató (GDPR) | Demo-Trade Kft.';
+    description = 'A Demo-Trade Kft. hivatalos adatkezelési szabályzata és adatvédelmi tájékoztatója.';
+    canonicalUrl = `${baseUrl}/adatkezeles`;
+  }
+
+  document.title = title;
+  const descMeta = document.querySelector('meta[name="description"]');
+  if (descMeta) descMeta.setAttribute('content', description);
+  const canonEl = document.getElementById('canonical-link') || document.querySelector('link[rel="canonical"]');
+  if (canonEl) canonEl.setAttribute('href', canonicalUrl);
+  const ogTitle = document.getElementById('og-title') || document.querySelector('meta[property="og:title"]');
+  if (ogTitle) ogTitle.setAttribute('content', title);
+  const ogDesc = document.getElementById('og-desc') || document.querySelector('meta[property="og:description"]');
+  if (ogDesc) ogDesc.setAttribute('content', description);
+  const ogUrl = document.getElementById('og-url') || document.querySelector('meta[property="og:url"]');
+  if (ogUrl) ogUrl.setAttribute('content', canonicalUrl);
 }
 
 
@@ -2116,6 +2171,124 @@ function attachEventListeners() {
     });
   }
 
+  // Facebook Post Interactivity & Live Preview
+  const fbCheckbox = document.getElementById('fb-publish-checkbox');
+  const fbOptionsPanel = document.getElementById('fb-options-panel');
+  const fbTextarea = document.getElementById('fb-custom-message');
+  const fbCounter = document.getElementById('fb-char-counter');
+  const fbAutoBtn = document.getElementById('fb-auto-generate-btn');
+  const fbManualShareBtn = document.getElementById('fb-manual-share-btn');
+  const fbPreviewMsg = document.getElementById('fb-preview-message-body');
+  const fbPreviewImg = document.getElementById('fb-preview-img');
+  const fbPreviewLinkTitle = document.getElementById('fb-preview-link-title');
+  const fbPreviewLinkDesc = document.getElementById('fb-preview-link-desc');
+
+  const generateFacebookTemplate = () => {
+    const type = document.querySelector('input[name="post-type"]:checked')?.value || 'blog';
+    const title = document.getElementById('post-title')?.value.trim() || 'Új Hirdetés';
+    const category = document.getElementById('post-category')?.value.trim() || 'Híreink';
+    const excerpt = document.getElementById('post-excerpt')?.value.trim() || '';
+    const price = document.getElementById('prod-price')?.value.trim();
+    const loc = document.getElementById('job-location')?.value.trim();
+    const jobType = document.getElementById('job-type-field')?.value.trim();
+
+    let text = '';
+    if (type === 'product') {
+      text = `🌱 ÚJ TERMÉK AJÁNLATUNK | DEMO-TRADE KFT.\n\n` +
+        `Megnevezés: ${title}\n` +
+        `Kategória: ${category}\n` +
+        (price ? `💰 Ár / Feltételek: ${price}\n` : '') +
+        (excerpt ? `\n📌 ${excerpt}\n` : '') +
+        `\n👉 Részletek és megrendelés a weboldalunkon!\n` +
+        `📞 Érdeklődjön szakértőinknél: +36 30 346 2848 | demo.trade.mg@gmail.com\n\n` +
+        `#demotrade #mezogazdasag #gyumolcstermesztes #oltvany #novenyvedelem`;
+    } else if (type === 'career') {
+      text = `💼 ÁLLÁSLEHETŐSÉG A DEMO-TRADE CSAPATÁBAN!\n\n` +
+        `Nyitott pozíció: ${title}\n` +
+        (loc ? `📍 Munkavégzés helye: ${loc}\n` : '') +
+        (jobType ? `⏱ Munkaidő: ${jobType}\n` : '') +
+        (excerpt ? `\n📌 ${excerpt}\n` : '') +
+        `\n👉 Jelentkezzen közvetlenül weboldalunkon önéletrajz feltöltésével!\n` +
+        `📞 Kapcsolat: +36 30 346 2848 | demo.trade.mg@gmail.com\n\n` +
+        `#allas #karrier #mezogazdasag #demotrade #nyiregyhaza`;
+    } else {
+      text = `📢 HÍREK & SZAKMAI TÁJÉKOZTATÓ | DEMO-TRADE KFT.\n\n` +
+        `${title}\n` +
+        `Téma: ${category}\n` +
+        (excerpt ? `\n${excerpt}\n` : '') +
+        `\n👉 Olvassa el a teljes szakmai összefoglalót weboldalunkon!\n` +
+        `#demotrade #mezogazdasag #szaktanacsadas #hirek`;
+    }
+    return text;
+  };
+
+  const updateFacebookPreviewCard = () => {
+    const title = document.getElementById('post-title')?.value.trim() || 'Hirdetés megnevezése';
+    const excerpt = document.getElementById('post-excerpt')?.value.trim() || 'Kattintson a részletekért!';
+    const type = document.querySelector('input[name="post-type"]:checked')?.value || 'blog';
+    const currentImg = document.getElementById('post-image')?.value.trim() || (type === 'product' ? '/images/gyumolcsfa_oltvanyok.jpg' : (type === 'career' ? '/images/karrier_csapat.jpg' : '/images/hero.png'));
+
+    if (fbPreviewMsg && fbTextarea) {
+      fbPreviewMsg.textContent = fbTextarea.value || 'Írjon bejegyzést...';
+    }
+    if (fbPreviewImg) {
+      fbPreviewImg.src = currentImg;
+    }
+    if (fbPreviewLinkTitle) {
+      fbPreviewLinkTitle.textContent = title;
+    }
+    if (fbPreviewLinkDesc) {
+      fbPreviewLinkDesc.textContent = excerpt;
+    }
+    if (fbCounter && fbTextarea) {
+      fbCounter.textContent = `${fbTextarea.value.length} karakter`;
+    }
+  };
+
+  if (fbCheckbox && fbOptionsPanel) {
+    fbCheckbox.addEventListener('change', () => {
+      if (fbCheckbox.checked) {
+        fbOptionsPanel.style.display = 'block';
+        if (fbTextarea && (!fbTextarea.value || fbTextarea.value.trim() === '')) {
+          fbTextarea.value = generateFacebookTemplate();
+        }
+        updateFacebookPreviewCard();
+      } else {
+        fbOptionsPanel.style.display = 'none';
+      }
+    });
+  }
+
+  if (fbAutoBtn && fbTextarea) {
+    fbAutoBtn.addEventListener('click', () => {
+      fbTextarea.value = generateFacebookTemplate();
+      updateFacebookPreviewCard();
+      showToast('Facebook sablon frissítve az űrlap adataiból!', 'info');
+    });
+  }
+
+  if (fbTextarea) {
+    fbTextarea.addEventListener('input', updateFacebookPreviewCard);
+  }
+
+  // Update image preview on file input changes
+  const postImgInput = document.getElementById('post-image');
+  if (postImgInput && fbPreviewImg) {
+    // Whenever post image preview updates
+    const origPreviewObserver = new MutationObserver(() => {
+      if (postImgInput.value) fbPreviewImg.src = postImgInput.value;
+    });
+    origPreviewObserver.observe(postImgInput, { attributes: true, attributeFilter: ['value'] });
+  }
+
+  // Manual fallback Facebook Share Dialog
+  if (fbManualShareBtn) {
+    fbManualShareBtn.addEventListener('click', () => {
+      const shareUrl = encodeURIComponent(window.location.origin + '/');
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`, 'fb-share-dialog', 'width=626,height=436');
+    });
+  }
+
   // Preview button in admin table rows
   document.querySelectorAll('.preview-item-table-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2220,6 +2393,44 @@ function attachEventListeners() {
         };
         savePosts([savedPostObj, ...state.posts], savedPostObj);
         showToast('Új bejegyzés sikeresen közzétéve a Supabase felhőben!');
+      }
+
+      // Facebook Poszt közzététele a háttérben, ha be volt pipálva
+      const shouldPublishToFb = document.getElementById('fb-publish-checkbox')?.checked;
+      const fbMessageText = document.getElementById('fb-custom-message')?.value?.trim();
+
+      if (shouldPublishToFb && fbMessageText) {
+        showToast('Facebook poszt közzététele a Demo-Trade Kft. oldalon...', 'info');
+        try {
+          // Ha lokális kép relatív útvonal (pl. /images/hero.png), abszolút URL-re konvertáljuk
+          let fbImageUrl = image;
+          if (fbImageUrl && fbImageUrl.startsWith('/')) {
+            fbImageUrl = window.location.origin + fbImageUrl;
+          }
+
+          const fbRes = await fetch('/api/facebook-post', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: fbMessageText,
+              imageUrl: fbImageUrl,
+              linkUrl: window.location.origin + (type === 'product' ? '/termekek' : (type === 'career' ? '/karrier' : '/hirek'))
+            })
+          });
+
+          const fbResult = await fbRes.json();
+          if (fbResult.success) {
+            showToast('Facebook poszt sikeresen közzétéve!', 'success');
+            if (fbResult.isSimulated) {
+              console.log('Facebook szimulált válasz:', fbResult);
+            }
+          } else {
+            showToast('Facebook hiba: ' + (fbResult.message || 'Sikertelen posztolás'), 'error');
+          }
+        } catch (fbErr) {
+          console.error('Facebook posting fetch error:', fbErr);
+          showToast('Nem sikerült kapcsolatot létesíteni a Facebook API-val.', 'error');
+        }
       }
 
       state.editingPostId = null;

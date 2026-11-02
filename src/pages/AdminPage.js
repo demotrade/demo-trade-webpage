@@ -267,6 +267,131 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
             <textarea id="post-content" style="display: none;">${editingPost ? editingPost.content : ''}</textarea>
           </div>
 
+          <!-- ========================================== -->
+          <!-- FACEBOOK MEGOSZTÁS & OPTIMALIZÁLÁS SZEKCIÓ -->
+          <!-- ========================================== -->
+          <div class="admin-fb-section" style="margin-top: 2rem; background: #f0f4f9; border: 2px solid #cbd5e1; border-radius: var(--radius-lg); padding: 1.8rem; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.2rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;">
+              <div style="display: flex; align-items: center; gap: 0.8rem;">
+                <div style="width: 44px; height: 44px; background: #1877f2; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                  <i class="fa-brands fa-facebook-f"></i>
+                </div>
+                <div>
+                  <h4 style="margin: 0; font-size: 1.2rem; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
+                    Facebook Posztolás &amp; Optimalizálás
+                    <span style="font-size: 0.75rem; background: #e0e7ff; color: #3730a3; padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 600;">@demotradekft</span>
+                  </h4>
+                  <p style="margin: 0.2rem 0 0; font-size: 0.85rem; color: #64748b;">
+                    Automatikus, méretre és figyelemfelkeltésre optimalizált bejegyzés a hivatalos Demo-Trade Kft. Facebook oldalra.
+                  </p>
+                </div>
+              </div>
+
+              <!-- FŐ KAPCSOLÓ (SWITCH) -->
+              <label style="display: inline-flex; align-items: center; gap: 0.6rem; cursor: pointer; font-weight: 700; color: #1e293b; background: #fff; padding: 0.6rem 1.2rem; border-radius: 999px; border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.05); user-select: none;">
+                <input type="checkbox" id="fb-publish-checkbox" style="width: 18px; height: 18px; accent-color: #1877f2; cursor: pointer;" />
+                <span><i class="fa-brands fa-facebook" style="color: #1877f2;"></i> Közzététel a Facebook oldalon is</span>
+              </label>
+            </div>
+
+            <!-- LENYÍLÓ FACEBOOK SZERKESZTŐ ÉS ÉLŐ ELŐNÉZET -->
+            <div id="fb-options-panel" style="display: none;">
+              <!-- FIGYELMEZTETÉS / TIPPEK AZ OPTIMÁLIS KÉPRE -->
+              <div style="background: #eef2ff; border-left: 4px solid #4f46e5; padding: 0.8rem 1.2rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.85rem; color: #312e81; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.8rem;">
+                <div>
+                  <strong><i class="fa-solid fa-wand-magic-sparkles"></i> Facebook képarány tipp:</strong> 
+                  Az ideális Facebook kép mérete <strong>1200 x 630 px</strong> (fekvő) vagy <strong>1080 x 1080 px</strong> (négyzetes). A rendszer automatikusan a feltöltött főképből generálja a posztot.
+                </div>
+                <button type="button" id="fb-auto-generate-btn" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.35rem 0.8rem; background: #fff; border-color: #c7d2fe; color: #4338ca;">
+                  <i class="fa-solid fa-arrows-rotate"></i> Szöveg újragenerálása űrlapból
+                </button>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 1.8rem;" class="admin-grid-2">
+                <!-- BAL OLDAL: SZERKESZTHETŐ FACEBOOK SZÖVEG -->
+                <div>
+                  <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="fb-custom-message" style="font-weight: 700; color: #1e293b; display: flex; justify-content: space-between;">
+                      <span>Facebook Poszt Szövege (Szerkeszthető)</span>
+                      <span id="fb-char-counter" style="font-size: 0.8rem; font-weight: normal; color: #64748b;">0 karakter</span>
+                    </label>
+                    <textarea id="fb-custom-message" class="form-control" style="min-height: 190px; font-family: inherit; font-size: 0.92rem; line-height: 1.6; resize: vertical;" placeholder="A bejegyzés szövege a Facebook falra..."></textarea>
+                    <small style="color: #64748b; font-size: 0.8rem; display: block; margin-top: 0.4rem;">
+                      💡 A cím, ár és elérhetőségek alapján automatikusan összeállítottuk. Tetszés szerint bővítheti emojikkal vagy hashtagekkel!
+                    </small>
+                  </div>
+
+                  <!-- KÖZVETLEN MEGOSZTÁS GOMB TARTALÉKNAK (Facebook Share Dialog) -->
+                  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.9rem 1.1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                    <span style="font-size: 0.82rem; color: #475569;">
+                      <i class="fa-solid fa-circle-info" style="color: #1877f2;"></i> Kézi megosztó ablak megnyitása:
+                    </span>
+                    <button type="button" id="fb-manual-share-btn" class="btn btn-outline" style="font-size: 0.82rem; padding: 0.4rem 0.9rem; border-color: #1877f2; color: #1877f2;">
+                      <i class="fa-solid fa-arrow-up-right-from-square"></i> Kézi Megosztás Megnyitása
+                    </button>
+                  </div>
+                </div>
+
+                <!-- JOBB OLDAL: FACEBOOK HÍRFOLYAM ÉLŐ ELŐNÉZET KÁRTYA -->
+                <div>
+                  <label style="font-weight: 700; color: #1e293b; display: block; margin-bottom: 0.5rem;">
+                    Élő Facebook Hírfolyam Előnézet
+                  </label>
+                  
+                  <!-- MOCK FACEBOOK FEED CARD -->
+                  <div class="fb-preview-mockup" style="background: #ffffff; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.08); border: 1px solid #dadde1; overflow: hidden; font-family: Helvetica, Arial, sans-serif;">
+                    <!-- HEADER -->
+                    <div style="padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;">
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <img src="/images/hero.png" alt="Demo-Trade Kft." style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid #e5e7eb;" />
+                        <div>
+                          <div style="font-weight: 700; font-size: 0.9rem; color: #050505; display: flex; align-items: center; gap: 4px;">
+                            Demo-Trade Kft.
+                            <i class="fa-solid fa-circle-check" style="color: #1877f2; font-size: 0.8rem;" title="Hivatalos Oldal"></i>
+                          </div>
+                          <div style="font-size: 0.75rem; color: #65676b; display: flex; align-items: center; gap: 4px;">
+                            <span>Most</span> &bull; <i class="fa-solid fa-earth-americas" style="font-size: 0.7rem;"></i>
+                          </div>
+                        </div>
+                      </div>
+                      <div style="color: #65676b; font-size: 1.1rem; cursor: pointer;">
+                        <i class="fa-solid fa-ellipsis"></i>
+                      </div>
+                    </div>
+
+                    <!-- POST MESSAGE BODY IN MOCK -->
+                    <div id="fb-preview-message-body" style="padding: 4px 14px 12px; font-size: 0.9rem; color: #050505; white-space: pre-line; word-break: break-word; line-height: 1.45;">
+                      Új ajánlat a kínálatunkban!
+                    </div>
+
+                    <!-- POST IMAGE IN MOCK -->
+                    <div style="background: #f0f2f5; position: relative; max-height: 250px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                      <img id="fb-preview-img" src="" alt="Facebook előnézet" style="width: 100%; height: 230px; object-fit: cover; display: block;" />
+                    </div>
+
+                    <!-- POST LINK FOOTER BAR -->
+                    <div style="background: #f0f2f5; padding: 10px 14px; border-top: 1px solid #e4e6eb;">
+                      <div style="font-size: 0.72rem; color: #65676b; text-transform: uppercase; letter-spacing: 0.5px;">demotrade.hu</div>
+                      <div id="fb-preview-link-title" style="font-weight: 700; font-size: 0.95rem; color: #050505; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                        Gép / Termék megnevezése
+                      </div>
+                      <div id="fb-preview-link-desc" style="font-size: 0.8rem; color: #65676b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">
+                        Kattintson a weboldal megtekintéséhez
+                      </div>
+                    </div>
+
+                    <!-- MOCK LIKES & COMMENTS BAR -->
+                    <div style="padding: 10px 14px; border-top: 1px solid #e4e6eb; display: flex; justify-content: space-around; color: #65676b; font-size: 0.85rem; font-weight: 600;">
+                      <div style="display: flex; align-items: center; gap: 6px;"><i class="fa-regular fa-thumbs-up"></i> Tetszik</div>
+                      <div style="display: flex; align-items: center; gap: 6px;"><i class="fa-regular fa-comment"></i> Hozzászólás</div>
+                      <div style="display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-share"></i> Megosztás</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- ACTION BUTTONS: PREVIEW + SAVE + CANCEL -->
           <div style="display: flex; gap: 1rem; margin-top: 2rem; flex-wrap: wrap; align-items: center;">
             <button type="submit" class="btn btn-primary" id="save-post-btn" style="padding: 0.9rem 2.2rem; font-size: 1rem;">
