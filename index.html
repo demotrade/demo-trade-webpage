@@ -141,7 +141,9 @@
             "telephone": "+36-30-440-2725",
             "address": {
               "@type": "PostalAddress",
+              "streetAddress": "Kisvárdai Területi Iroda",
               "addressLocality": "Kisvárda",
+              "postalCode": "4600",
               "addressRegion": "Szabolcs-Szatmár-Bereg",
               "addressCountry": "HU"
             }
@@ -422,16 +424,23 @@
         "title": "Mezőgazdasági szaktanácsadó (Nyíregyháza, Kisvárda)",
         "description": "A Demo-Trade Kft. Területi Szaktanácsadási Központ meglévő és új partnereink színvonalas kiszolgálására mezőgazdasági szaktanácsadó munkatársat keres Nyíregyháza vagy Kisvárda munkavégzési hellyel. Feladatok: gazdálkodási napló vezetése, tápanyag-gazdálkodási terv, nitrátjelentés, támogatások és pályázatok ügyintézése.",
         "datePosted": "2026-10-08",
+        "validThrough": "2027-12-31T23:59:59+01:00",
         "employmentType": "FULL_TIME",
         "hiringOrganization": {
-          "@id": "https://demotradekft.hu/#organization"
+          "@type": "Organization",
+          "@id": "https://demotradekft.hu/#organization",
+          "name": "Demo-Trade Kft.",
+          "sameAs": "https://demotradekft.hu/",
+          "logo": "https://demotradekft.hu/demo-trade-logo.jpg"
         },
         "jobLocation": [
           {
             "@type": "Place",
             "address": {
               "@type": "PostalAddress",
+              "streetAddress": "Lengyel utca 15.",
               "addressLocality": "Nyíregyháza",
+              "postalCode": "4400",
               "addressRegion": "Szabolcs-Szatmár-Bereg",
               "addressCountry": "HU"
             }
@@ -440,12 +449,24 @@
             "@type": "Place",
             "address": {
               "@type": "PostalAddress",
+              "streetAddress": "Kisvárdai Területi Iroda",
               "addressLocality": "Kisvárda",
+              "postalCode": "4600",
               "addressRegion": "Szabolcs-Szatmár-Bereg",
               "addressCountry": "HU"
             }
           }
-        ]
+        ],
+        "baseSalary": {
+          "@type": "MonetaryAmount",
+          "currency": "HUF",
+          "value": {
+            "@type": "QuantitativeValue",
+            "minValue": 450000,
+            "maxValue": 750000,
+            "unitText": "MONTH"
+          }
+        }
       },
       {
         "@type": "FAQPage",
