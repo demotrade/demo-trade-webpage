@@ -1,5 +1,6 @@
 import './styles.css';
 import { INITIAL_POSTS } from './data/initialPosts.js';
+import { INITIAL_STAFF } from './data/initialStaff.js';
 import { renderHeader } from './components/Header.js';
 import { renderFooter } from './components/Footer.js';
 import { renderHomePage } from './pages/HomePage.js';
