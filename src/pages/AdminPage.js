@@ -1,5 +1,7 @@
 import { normalizeRichContentHtml } from '../utils/contentNormalizer.js';
 import { INITIAL_STAFF, OFFICES_META } from '../data/initialStaff.js';
+import { isJobActive } from '../utils/jobStatus.js';
+import { getRememberedAdminEmail } from '../utils/adminAuth.js';
 
 export const CATEGORY_OPTIONS_BY_TYPE = {
   blog: [
@@ -56,7 +58,7 @@ export function renderPasswordEyeSvg(isVisible = false) {
   `;
 }
 
-export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeFilter = 'all', staffList = INITIAL_STAFF, editingStaffId = null) {
+export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeFilter = 'all', staffList = INITIAL_STAFF, editingStaffId = null, adminTab = 'content', newType = null) {
   if (!isLoggedIn) {
     return `
       <div class="container" style="padding-top: 5rem; padding-bottom: 6rem; max-width: 480px;">
@@ -65,13 +67,17 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
             <i class="fa-solid fa-lock"></i>
           </div>
           <h2 style="font-size: 1.8rem; margin-bottom: 0.5rem;">Admin Belépés</h2>
-          <p style="color: var(--gray-600); font-size: 0.95rem; margin-bottom: 2rem;">Kérjük adja meg az adminisztrátori jelszót a szerkesztő eléréséhez!</p>
+          <p style="color: var(--gray-600); font-size: 0.95rem; margin-bottom: 2rem;">Kérjük, jelentkezzen be az e-mail címével és a jelszavával a szerkesztő eléréséhez!</p>
 
           <form id="admin-login-form" novalidate>
             <div class="form-group" style="text-align: left;">
+              <label for="admin-email">E-mail cím</label>
+              <input type="email" id="admin-email" class="form-control" placeholder="Az Ön e-mail címe" value="${String(getRememberedAdminEmail()).replace(/"/g, '&quot;').replace(/</g, '&lt;')}" autocomplete="username" required />
+            </div>
+            <div class="form-group" style="text-align: left;">
               <label for="admin-password">Jelszó</label>
               <div class="password-field-wrapper">
-                <input type="password" id="admin-password" class="form-control" placeholder="Adja meg a jelszót..." required autofocus />
+                <input type="password" id="admin-password" class="form-control" placeholder="Adja meg a jelszót..." autocomplete="current-password" required />
                 <button type="button" class="password-eye-toggle" data-target-input="admin-password" aria-label="Jelszó megjelenítése vagy elrejtése" title="Jelszó megjelenítése / elrejtése">
                   ${renderPasswordEyeSvg(false)}
                 </button>
@@ -88,7 +94,7 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
   }
 
   const editingPost = editingPostId ? posts.find(p => p.id === editingPostId) : null;
-  const currentType = editingPost ? (editingPost.type || 'blog') : 'blog';
+  const currentType = editingPost ? (editingPost.type || 'blog') : (['blog', 'career', 'product'].includes(newType) ? newType : 'blog');
   const defaultCatForType = currentType === 'career' ? 'Szaktanácsadás' : (currentType === 'product' ? 'Gyümölcsfa oltványok' : 'Híreink');
   const currentCategory = editingPost && editingPost.category ? editingPost.category : defaultCatForType;
   const baseCategories = CATEGORY_OPTIONS_BY_TYPE[currentType] || CATEGORY_OPTIONS_BY_TYPE.blog;
@@ -115,21 +121,27 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
           </p>
         </div>
         <div style="display: flex; gap: 0.8rem; flex-wrap: wrap;">
-          <button type="button" class="btn btn-primary" id="jump-to-staff-btn" style="padding: 0.65rem 1.2rem; font-size: 0.9rem;">
-            <i class="fa-solid fa-users-gear"></i> Munkatársak Kezelése (${activeStaff.length})
-          </button>
           <a href="/" target="_blank" class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.4); text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem;" title="Weboldal megtekintése új böngészőlapon">
             <i class="fa-solid fa-arrow-up-right-from-square"></i> Weboldal Megtekintése
           </a>
-          <button class="btn btn-secondary" id="reset-posts-btn" title="Alapértelmezett cikkek és termékek visszaállítása">
-            <i class="fa-solid fa-rotate-left"></i> Alapállapot
-          </button>
           <button class="btn btn-outline" id="admin-logout-btn" style="color: white; border-color: rgba(255,255,255,0.4);">
             <i class="fa-solid fa-right-from-bracket"></i> Kijelentkezés
           </button>
         </div>
       </div>
 
+      <!-- ADMIN TAB BAR: Tartalmak / Munkatársak -->
+      <div class="admin-tabs" role="tablist" style="margin-bottom: 2rem;">
+        <button type="button" role="tab" class="admin-tab-btn ${adminTab !== 'staff' ? 'active' : ''}" data-admin-tab="content" aria-selected="${adminTab !== 'staff'}">
+          <i class="fa-solid fa-newspaper"></i> Tartalmak <span class="admin-tab-count">${posts.length}</span>
+        </button>
+        <button type="button" role="tab" class="admin-tab-btn ${adminTab === 'staff' ? 'active' : ''}" data-admin-tab="staff" aria-selected="${adminTab === 'staff'}">
+          <i class="fa-solid fa-users-gear"></i> Munkatársak <span class="admin-tab-count">${activeStaff.length}</span>
+        </button>
+      </div>
+
+
+      ${adminTab !== 'staff' ? `
       <!-- FORM CARD -->
       <div class="admin-card" style="margin-bottom: 3rem; padding: 2.5rem;">
         <h3 style="font-size: 1.5rem; margin-bottom: 1.8rem; display: flex; align-items: center; gap: 0.6rem; border-bottom: 2px solid var(--primary-light); padding-bottom: 0.8rem;">
@@ -137,7 +149,7 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
           ${editingPost ? 'Tartalom Módosítása' : 'Új Tartalom Létrehozása'}
         </h3>
 
-        <form id="admin-post-form" novalidate>
+        <form id="admin-post-form" novalidate data-current-type="${currentType}">
           <input type="hidden" id="post-id" value="${editingPost ? editingPost.id : ''}" />
 
           <!-- STEP 1: CONTENT TYPE SELECTOR (PROMINENT TABS) -->
@@ -204,16 +216,24 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
               <label for="job-deadline" style="font-weight: 700;"><i class="fa-regular fa-calendar-check" style="color: var(--primary);"></i> Határidő</label>
               <input type="text" id="job-deadline" class="form-control" placeholder="Pl. Folyamatos felvétel" value="${editingPost && editingPost.deadline ? editingPost.deadline : 'Folyamatos felvétel'}" />
             </div>
+            <div class="form-group" style="margin: 0; grid-column: 1 / -1;">
+              <label class="job-active-switch" for="job-active-checkbox" style="display: flex; align-items: center; gap: 0.7rem; cursor: pointer; background: #fff; border: 1.5px solid var(--gray-200); border-radius: var(--radius-md); padding: 0.85rem 1.1rem; margin: 0; font-weight: 700; color: var(--dark);">
+                <input type="checkbox" id="job-active-checkbox" ${(!editingPost || isJobActive(editingPost)) ? 'checked' : ''} style="width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer;" />
+                <span>Aktív hirdetés &ndash; megjelenik a Karrier oldalon
+                  <span style="display: block; font-weight: 500; font-size: 0.82rem; color: var(--gray-600); margin-top: 0.1rem;">Ha kikapcsolja, a hirdetés szövege megmarad, de az oldalon a „Jelenleg nincs szabad pozíciónk” felirat látszik. Később egy kattintással újra bekapcsolható.</span>
+                </span>
+              </label>
+            </div>
           </div>
 
           <!-- 2. PRODUCT SPECIFIC FIELDS -->
           <div id="product-extra-fields" style="display: ${currentType === 'product' ? 'grid' : 'none'}; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; background: var(--gray-50); padding: 1.2rem; border-radius: var(--radius-md); border: 1px solid var(--gray-200);">
             <div class="form-group" style="margin: 0;">
-              <label for="prod-price" style="font-weight: 700;"><i class="fa-solid fa-tag" style="color: var(--accent);"></i> Ár / Érdeklődés Jelleg</label>
-              <input type="text" id="prod-price" class="form-control" placeholder="Pl. Egyedi árajánlat / Mennyiségi kedvezmény" value="${editingPost && editingPost.price ? editingPost.price : 'Egyedi árajánlat alapján'}" />
+              <label for="prod-price" style="font-weight: 700;"><i class="fa-solid fa-tag" style="color: var(--accent);"></i> Ár (pl. 2.890 Ft / db)</label>
+              <input type="text" id="prod-price" class="form-control" placeholder="Pl. 2.890 Ft / db vagy Egyedi árajánlat alapján" value="${editingPost && editingPost.price ? editingPost.price : 'Egyedi árajánlat alapján'}" />
             </div>
             <div class="form-group" style="margin: 0;">
-              <label for="prod-badge" style="font-weight: 700;"><i class="fa-solid fa-certificate" style="color: var(--accent);"></i> Kiemelő Címke (Badge)</label>
+              <label for="prod-badge" style="font-weight: 700;"><i class="fa-solid fa-certificate" style="color: var(--accent);"></i> Kiemelő címke (a termékkártya sarkában jelenik meg)</label>
               <input type="text" id="prod-badge" class="form-control" placeholder="Pl. Minősített I. Osztály, Raktáron..." value="${editingPost && editingPost.badge ? editingPost.badge : 'Minősített Szaporítóanyag'}" />
             </div>
           </div>
@@ -271,16 +291,6 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
                 <option value="h2">Nagy Alcím (H2)</option>
                 <option value="h3">Közepes Alcím (H3)</option>
                 <option value="h4">Kis Alcím (H4)</option>
-              </select>
-
-              <!-- FONT SIZE SELECT -->
-              <select id="editor-fontsize-select" class="editor-select" title="Betűméret beállítása" style="height: 32px; font-size: 0.85rem; border: 1px solid var(--gray-300); border-radius: 4px; padding: 0 6px; background: #fff; cursor: pointer;">
-                <option value="">Alapértelmezett méret</option>
-                <option value="2">Kisebb (13px)</option>
-                <option value="3">Normál (16px)</option>
-                <option value="4">Közepes (18px)</option>
-                <option value="5">Nagy (22px)</option>
-                <option value="6">Kiemelt (28px)</option>
               </select>
 
               <div style="width: 1px; height: 22px; background: var(--gray-300); margin: 0 0.2rem;"></div>
@@ -441,7 +451,7 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
 
                     <!-- POST LINK FOOTER BAR -->
                     <div style="background: #f0f2f5; padding: 10px 14px; border-top: 1px solid #e4e6eb;">
-                      <div style="font-size: 0.72rem; color: #65676b; text-transform: uppercase; letter-spacing: 0.5px;">demotrade.hu</div>
+                      <div style="font-size: 0.72rem; color: #65676b; text-transform: uppercase; letter-spacing: 0.5px;">demotradekft.hu</div>
                       <div id="fb-preview-link-title" style="font-weight: 700; font-size: 0.95rem; color: #050505; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
                         Gép / Termék megnevezése
                       </div>
@@ -560,6 +570,11 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
                         <span class="admin-type-badge ${typeBadgeClass}">
                           <i class="fa-solid ${typeIcon}"></i> ${typeLabel}
                         </span>
+                        ${type === 'career' ? (isJobActive(post) ? `
+                          <div style="margin-top: 0.4rem;"><span style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.74rem; font-weight: 700; color: #15803d; background: #dcfce7; padding: 0.15rem 0.6rem; border-radius: 999px;"><i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i> Aktív (látható)</span></div>
+                        ` : `
+                          <div style="margin-top: 0.4rem;"><span style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.74rem; font-weight: 700; color: #b45309; background: #fef3c7; padding: 0.15rem 0.6rem; border-radius: 999px;"><i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i> Inaktív (rejtett)</span></div>
+                        `) : ''}
                       </td>
                       <td style="padding: 0.8rem;">
                         <div style="font-weight: 700; color: var(--dark); font-size: 0.95rem;">${post.title}</div>
@@ -570,6 +585,11 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
                         <div style="color: var(--gray-500);">${post.date}</div>
                       </td>
                       <td style="text-align: right; padding: 0.8rem; white-space: nowrap;">
+                        ${type === 'career' ? `
+                          <button class="action-btn toggle-job-btn" data-id="${post.id}" style="margin-right: 0.4rem; padding: 0.4rem 0.8rem; font-size: 0.82rem; border-radius: 6px; font-weight: 700; ${isJobActive(post) ? 'background: #fef3c7; border: 1px solid #fcd34d; color: #92400e;' : 'background: #dcfce7; border: 1px solid #86efac; color: #166534;'}" title="${isJobActive(post) ? 'Hirdetés elrejtése az oldalról (a szöveg megmarad)' : 'Hirdetés újra megjelenítése az oldalon'}">
+                            <i class="fa-solid ${isJobActive(post) ? 'fa-eye-slash' : 'fa-eye'}"></i> ${isJobActive(post) ? 'Inaktiválás' : 'Aktiválás'}
+                          </button>
+                        ` : ''}
                         <button class="action-btn preview-item-table-btn" data-id="${post.id}" style="margin-right: 0.4rem; padding: 0.4rem 0.7rem; font-size: 0.82rem; background: var(--gray-100); border: 1px solid var(--gray-300); border-radius: 6px;" title="Megtekintés">
                           <i class="fa-solid fa-eye"></i>
                         </button>
@@ -588,7 +608,9 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
           </table>
         </div>
       </div>
+      `: ''}
 
+      ${adminTab === 'staff' ? `
       <!-- ========================================================= -->
       <!-- MUNKATÁRSAINK & IRODÁK KEZELÉSE SZEKCIÓ                   -->
       <!-- ========================================================= -->
@@ -603,9 +625,6 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
               Itt adhat hozzá új munkatársat, módosíthatja a meglévők nevét, beosztását, telefonszámát vagy irodai besorolását. A változások azonnal megjelennek a Főoldalon, a Kapcsolat oldalon és az Impresszumban is.
             </p>
           </div>
-          <button type="button" class="btn btn-outline" id="reset-staff-btn" style="font-size: 0.85rem; padding: 0.55rem 1.1rem;">
-            <i class="fa-solid fa-rotate-left"></i> Alapértelmezett névsor visszaállítása
-          </button>
         </div>
 
         <!-- STAFF ADD / EDIT FORM -->
@@ -708,6 +727,7 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
           }).join('')}
         </div>
       </div>
+      `: ''}
 
       <!-- LIVE PREVIEW MODAL (Előkép / Megtekintési Lehetőség) -->
       <div class="product-modal-backdrop" id="admin-preview-modal" style="display: none;">

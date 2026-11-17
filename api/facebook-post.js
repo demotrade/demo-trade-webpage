@@ -5,20 +5,26 @@
  * Környezeti változók:
  * - FB_PAGE_ID: A Demo-Trade Facebook Oldal azonosítója (pl. 'demotradekft' vagy numerikus ID)
  * - FB_PAGE_ACCESS_TOKEN: A tartós Facebook Page Token (pages_manage_posts jogosultsággal)
+ *
+ * Védelem: csak bejelentkezett admin hívhatja (Authorization: Bearer <Supabase token>).
  */
 
-export default async function handler(req, res) {
-  // CORS engedélyezése
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+import { verifyAdmin } from './_verifyAdmin.js';
 
+export default async function handler(req, res) {
+  // Nincs CORS-engedély: az admin felület ugyanarról a domainről hívja a végpontot.
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    return res.status(204).end();
   }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, message: 'Csak POST kérés engedélyezett.' });
+  }
+
+  // Csak bejelentkezett admin posztolhat a cég Facebook oldalára
+  const auth = await verifyAdmin(req);
+  if (!auth.ok) {
+    return res.status(auth.status).json({ success: false, message: auth.message });
   }
 
   try {

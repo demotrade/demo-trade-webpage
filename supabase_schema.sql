@@ -38,13 +38,9 @@ CREATE POLICY "Public read web_posts"
   FOR SELECT
   USING (true);
 
--- 5. Jogosultságok: Mentés és törlés engedélyezése az anon / admin klienseknek
+-- 5. Írási jogok: NINCS nyitott írás (korábban bárki írhatott!). Csak a bejelentkezett admin írhat;
+--    a szabályokat a supabase_security_2_lockdown.sql hozza létre.
 DROP POLICY IF EXISTS "Allow anon all on web_posts" ON public.web_posts;
-CREATE POLICY "Allow anon all on web_posts"
-  ON public.web_posts
-  FOR ALL
-  USING (true)
-  WITH CHECK (true);
 
 -- 6. Storage Bucket ellenőrzése / létrehozása (ha még nem létezne)
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -63,15 +59,9 @@ CREATE POLICY "Public view for webpage-images"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'webpage-images');
 
+-- Feltöltés / módosítás / törlés: csak a bejelentkezett admin (lásd supabase_security_2_lockdown.sql).
 DROP POLICY IF EXISTS "Allow upload to webpage-images" ON storage.objects;
-CREATE POLICY "Allow upload to webpage-images"
-  ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'webpage-images');
-
 DROP POLICY IF EXISTS "Allow update to webpage-images" ON storage.objects;
-CREATE POLICY "Allow update to webpage-images"
-  ON storage.objects FOR UPDATE
-  USING (bucket_id = 'webpage-images');
 
 -- KÉSZ! A tábla és a képtárhely készen áll az éles használatra.
 

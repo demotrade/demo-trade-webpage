@@ -1,8 +1,18 @@
 -- ==============================================================================
 -- DEMO-TRADE KFT. — MUNKATÁRSAK TÁBLA (Admin felületről szerkeszthető névsor)
--- Futtassa le EGYSZER: Supabase Irányítópult -> SQL Editor -> New Query -> Run
+-- Futtassa le a Supabase Irányítópult -> SQL Editor felületén!
 -- ==============================================================================
 
+-- Segédfüggvény (ha még nem létezne): admin jogosultság vizsgálata JWT tokenből
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT COALESCE((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin', false);
+$$;
+
+-- Munkatársak tábla létrehozása
 CREATE TABLE IF NOT EXISTS public.web_staff (
   id TEXT PRIMARY KEY,
   office TEXT NOT NULL,            -- 'nyiregyhaza' | 'kisvarda' | 'tarpa'
@@ -15,18 +25,35 @@ CREATE TABLE IF NOT EXISTS public.web_staff (
 
 CREATE INDEX IF NOT EXISTS idx_web_staff_sort ON public.web_staff(sort_order);
 
+-- Biztonsági szabályok (RLS):
+-- Bárki (látogatók és be nem lépettek) olvashatja a munkatársakat,
+-- de MÓDOSÍTANI / TÖRÖLNI / ÚJAT HOZZÁADNI KIZÁRÓLAG a bejelentkezett admin tud.
 ALTER TABLE public.web_staff ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Public read web_staff" ON public.web_staff;
-CREATE POLICY "Public read web_staff"
-  ON public.web_staff FOR SELECT USING (true);
-
--- Megegyezik a web_posts táblánál használt megoldással (az admin belépés kliensoldali)
 DROP POLICY IF EXISTS "Allow anon all on web_staff" ON public.web_staff;
-CREATE POLICY "Allow anon all on web_staff"
-  ON public.web_staff FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public read web_staff" ON public.web_staff;
+DROP POLICY IF EXISTS "Admin insert web_staff" ON public.web_staff;
+DROP POLICY IF EXISTS "Admin update web_staff" ON public.web_staff;
+DROP POLICY IF EXISTS "Admin delete web_staff" ON public.web_staff;
 
--- Kezdő névsor (a weboldalon eddig látható adatok)
+CREATE POLICY "Public read web_staff"
+  ON public.web_staff FOR SELECT TO anon, authenticated
+  USING (true);
+
+CREATE POLICY "Admin insert web_staff"
+  ON public.web_staff FOR INSERT TO authenticated
+  WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admin update web_staff"
+  ON public.web_staff FOR UPDATE TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admin delete web_staff"
+  ON public.web_staff FOR DELETE TO authenticated
+  USING (public.is_admin());
+
+-- Kezdő névsor feltöltése (a weboldalon eddig látható adatok)
 INSERT INTO public.web_staff (id, office, name, role, phone, sort_order) VALUES
   ('staff-nyh-1', 'nyiregyhaza', 'Moravszki Gábor', 'ügyvezető igazgató, növényorvos', '+36 30 346 2848', 0),
   ('staff-nyh-2', 'nyiregyhaza', 'Sápi Imre', 'irodavezető, szaktanácsadó', '+36 30 559 7376', 1),

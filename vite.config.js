@@ -1,7 +1,15 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import nodemailer from 'nodemailer';
+import { verifyAdmin } from './api/_verifyAdmin.js';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Helyi fejlesztéshez: a .env.local értékei elérhetők legyenek a dev szerver végpontjainak is.
+  const localEnv = loadEnv(mode, process.cwd(), '');
+  for (const [key, value] of Object.entries(localEnv)) {
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+
+  return {
   plugins: [
     {
       name: 'smtp-mail-sender-plugin',
@@ -35,14 +43,20 @@ export default defineConfig({
                   return res.end(JSON.stringify({ success: false, message: 'Kérjük fogadja el az Adatkezelési tájékoztatót!' }));
                 }
 
-                // SMTP configuration from user credentials
+                // A jelszó SOHA nem lehet a kódban: a .env.local fájlból (SMTP_PASS) jön.
+                if (!process.env.SMTP_PASS) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  return res.end(JSON.stringify({ success: false, message: 'Helyi fejlesztésben az e-mail küldéshez add meg a SMTP_PASS értéket a .env.local fájlban.' }));
+                }
+
                 const transporter = nodemailer.createTransport({
                   host: 'smtp.gmail.com',
                   port: 465,
                   secure: true,
                   auth: {
-                    user: 'demotradekft@gmail.com',
-                    pass: 'cjjxniblpeyetuvm'
+                    user: process.env.SMTP_USER || 'demotradekft@gmail.com',
+                    pass: process.env.SMTP_PASS
                   }
                 });
 
@@ -258,75 +272,6 @@ export default defineConfig({
           }
         });
 
-        // Supabase Pro Image Upload Middleware for local dev
-        server.middlewares.use('/api/upload-image', async (req, res) => {
-          if (req.method === 'POST') {
-            let body = '';
-            req.on('data', chunk => { body += chunk.toString(); });
-            req.on('end', async () => {
-              try {
-                const { imageBase64, filename = 'image.jpg', folder = 'posts' } = JSON.parse(body);
-
-                if (!imageBase64) {
-                  res.statusCode = 400;
-                  res.setHeader('Content-Type', 'application/json');
-                  return res.end(JSON.stringify({ success: false, message: 'Hiányzó képadat.' }));
-                }
-
-                const { createClient } = await import('@supabase/supabase-js');
-                const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://netwmohjucdoomghiuzk.supabase.co';
-                const SUPABASE_SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldHdtb2hqdWNkb29tZ2hpdXprIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mjk1ODMwNSwiZXhwIjoyMDk4NTM0MzA1fQ.MZs0tlNQovIvK127FqbQORe73A97BfZY68RH4LXKz9A';
-                const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-                const matches = imageBase64.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
-                let mimeType = 'image/jpeg';
-                let base64Data = imageBase64;
-                if (matches && matches.length === 3) {
-                  mimeType = matches[1];
-                  base64Data = matches[2];
-                }
-
-                const buffer = Buffer.from(base64Data, 'base64');
-                const ext = mimeType.includes('png') ? 'png' : (mimeType.includes('webp') ? 'webp' : 'jpg');
-                const cleanName = filename.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').substring(0, 40) || 'upload';
-                const storagePath = `${folder}/${Date.now()}-${cleanName}.${ext}`;
-
-                const { error: uploadErr } = await supabaseAdmin.storage
-                  .from('webpage-images')
-                  .upload(storagePath, buffer, {
-                    contentType: mimeType,
-                    upsert: true
-                  });
-
-                if (uploadErr) {
-                  res.statusCode = 500;
-                  res.setHeader('Content-Type', 'application/json');
-                  return res.end(JSON.stringify({ success: false, message: uploadErr.message }));
-                }
-
-                const { data: pubData } = supabaseAdmin.storage
-                  .from('webpage-images')
-                  .getPublicUrl(storagePath);
-
-                res.statusCode = 200;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({
-                  success: true,
-                  publicUrl: pubData.publicUrl,
-                  path: storagePath
-                }));
-              } catch (err) {
-                res.statusCode = 500;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: false, message: err.message }));
-              }
-            });
-          } else {
-            res.statusCode = 405;
-            res.end();
-          }
-        });
-
         // Meta Facebook Graph API Middleware for local dev
         server.middlewares.use('/api/facebook-post', async (req, res) => {
           if (req.method === 'POST') {
@@ -334,6 +279,13 @@ export default defineConfig({
             req.on('data', chunk => { body += chunk.toString(); });
             req.on('end', async () => {
               try {
+                const auth = await verifyAdmin(req);
+                if (!auth.ok) {
+                  res.statusCode = auth.status;
+                  res.setHeader('Content-Type', 'application/json');
+                  return res.end(JSON.stringify({ success: false, message: auth.message }));
+                }
+
                 const { message, imageUrl, linkUrl, published = true } = JSON.parse(body);
 
                 if (!message || message.trim() === '') {
@@ -418,4 +370,5 @@ export default defineConfig({
       }
     }
   ]
+  };
 });

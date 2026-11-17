@@ -17,6 +17,8 @@ import { renderNotFoundPage } from './pages/NotFoundPage.js';
 import { renderCookieBanner } from './components/CookieBanner.js';
 import { supabase } from './utils/supabaseClient.js';
 import { normalizeRichContentHtml } from './utils/contentNormalizer.js';
+import { isJobActive, getActiveJobs, JOB_ACTIVE_MARK, JOB_INACTIVE_MARK } from './utils/jobStatus.js';
+import { adminSignIn, adminSignOut, getAdminSession, getAdminAccessToken, isAdminUser } from './utils/adminAuth.js';
 
 // --- STATE MANAGEMENT ---
 let state = {
@@ -28,21 +30,19 @@ let state = {
   selectedCategory: 'all',
   currentPage: 1,
   editingPostId: null,
-  isLoggedIn: sessionStorage.getItem('demotrade_admin_logged_in') === 'true',
+  isLoggedIn: false,
+  authReady: false,
   productCategory: 'all',
   productSearch: '',
   activeProductId: null,
   adminTableFilter: 'all',
   selectedCvAttachment: null,
   staff: loadStaff(),
-  editingStaffId: null
+  editingStaffId: null,
+  adminTab: 'content',
+  adminNewType: null
 };
 
-const STAGING_DEV_PASSWORD = 'MoRa!b18jA';
-
-function isStagingUnlocked() {
-  return sessionStorage.getItem('demotrade_preview_unlocked') === 'true' || state.isLoggedIn;
-}
 
 function getPostsSignature(list) {
   if (!Array.isArray(list)) return '';
@@ -67,6 +67,7 @@ async function syncPostsFromSupabase() {
 
       state.posts = data;
       localStorage.setItem('demotrade_posts', JSON.stringify(data));
+      updateJobPostingSchema();
 
       // ONLY re-render if the database content differs AND the active page actually displays posts
       const postDependentPages = ['blog', 'career', 'karrier', 'allas', 'products', 'termekek', 'admin'];
@@ -191,13 +192,15 @@ function loadPosts() {
   return INITIAL_POSTS;
 }
 
-function savePosts(posts, postToSync = null) {
+// Mentés a böngészőbe + (ha adott) a közös tárolóba. Igazat ad vissza, ha a közös tárolóba is sikerült írni.
+async function savePosts(posts, postToSync = null) {
   state.posts = posts;
   localStorage.setItem('demotrade_posts', JSON.stringify(posts));
 
-  // Sync with Supabase Pro Database if post provided
-  if (postToSync) {
-    supabase.from('web_posts').upsert({
+  if (!postToSync) return true;
+
+  try {
+    const { error } = await supabase.from('web_posts').upsert({
       id: postToSync.id,
       type: postToSync.type || 'blog',
       title: postToSync.title,
@@ -213,10 +216,28 @@ function savePosts(posts, postToSync = null) {
       price: postToSync.price || null,
       badge: postToSync.badge || null,
       updated_at: new Date().toISOString()
-    }).then(({ error }) => {
-      if (error) console.warn('Supabase post upsert notice:', error.message);
     });
+    if (error) {
+      console.warn('Post save notice:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Post save notice:', err);
+    return false;
   }
+}
+
+// Érthető visszajelzés mentés után (sikeres / csak helyben mentett)
+function reportSaveResult(ok, successMsg, successTitle) {
+  if (ok) {
+    return showToast(successMsg, 'success', successTitle);
+  }
+  return showToast(
+    'A bejegyzés ebben a böngészőben elmentődött, de a weboldalra (a közös tárolóba) nem sikerült feltölteni, ezért a látogatók még nem látják. Kérjük, ellenőrizze az internetkapcsolatot, és mentse el újra. Ha a hiba ismétlődik, jelentkezzen ki és be újra, vagy értesítse a weboldal készítőjét.',
+    'error',
+    'A közzététel nem sikerült'
+  );
 }
 
 // --- UNIFIED MODAL SYSTEM (Replaces browser alerts, confirms, prompts & toasts) ---
@@ -614,7 +635,9 @@ function render() {
       mainContent = renderPrivacyPage();
       break;
     case 'admin':
-      mainContent = renderAdminPage(state.posts, state.isLoggedIn, state.editingPostId, state.adminTableFilter, state.staff, state.editingStaffId);
+      mainContent = state.authReady
+        ? renderAdminPage(state.posts, state.isLoggedIn, state.editingPostId, state.adminTableFilter, state.staff, state.editingStaffId, state.adminTab, state.adminNewType)
+        : '<div class="container" style="padding: 8rem 1.5rem; text-align: center; color: var(--gray-600);"><i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i><p style="margin-top: 1rem; text-align: center;">Betöltés...</p></div>';
       break;
     case 'not-found':
       mainContent = renderNotFoundPage();
@@ -623,73 +646,7 @@ function render() {
       mainContent = renderNotFoundPage();
   }
 
-  const isGatedPage = ['career', 'karrier', 'allas', 'allashirdetes', 'products', 'termekek', 'oltvanyok'].includes(state.activePage);
-  const stagingUnlocked = isStagingUnlocked();
-
-  let stagingHtml = '';
-  if (isGatedPage) {
-    if (!stagingUnlocked) {
-      document.body.style.overflow = 'hidden';
-      stagingHtml = `
-        <div class="staging-gate-overlay" id="staging-gate-overlay">
-          <div class="staging-gate-card">
-            <div class="staging-icon">
-              <i class="fa-solid fa-person-digging"></i>
-            </div>
-            <div class="staging-badge">
-              <i class="fa-solid fa-lock"></i> Előkészület alatt
-            </div>
-            <h2>Az oldal még kialakítás alatt van, nézzen vissza később!</h2>
-            <p>
-              Ezen a menüponton jelenleg a legfrissebb információk feltöltése és szakmai előkészítése zajlik. Hamarosan elérhetővé válik minden látogatónk számára!
-            </p>
-
-            <div style="display: flex; gap: 0.8rem; justify-content: center; margin-bottom: 1.5rem;">
-              <button type="button" class="btn btn-primary" id="staging-back-home-btn">
-                <i class="fa-solid fa-house"></i> Vissza a Főoldalra
-              </button>
-            </div>
-
-            <div class="staging-dev-box">
-              <div class="staging-dev-title">
-                <i class="fa-solid fa-key"></i> Fejlesztői teszt hozzáférés
-              </div>
-              <form class="staging-form" id="staging-unlock-form" novalidate>
-                <div class="password-field-wrapper">
-                  <input 
-                    type="password" 
-                    id="staging-password-input" 
-                    class="form-control" 
-                    placeholder="Fejlesztői jelszó..." 
-                    autocomplete="current-password"
-                    required 
-                  />
-                  <button type="button" class="password-eye-toggle" data-target-input="staging-password-input" aria-label="Jelszó megjelenítése vagy elrejtése" title="Jelszó megjelenítése / elrejtése">
-                    ${renderPasswordEyeSvg(false)}
-                  </button>
-                </div>
-                <button type="submit" class="btn btn-outline" style="white-space: nowrap;">
-                  <i class="fa-solid fa-unlock"></i> Feloldás
-                </button>
-              </form>
-              <div id="staging-error-msg" style="display: none; color: #dc2626; font-size: 0.85rem; margin-top: 0.6rem; font-weight: 600;">
-                <i class="fa-solid fa-circle-exclamation"></i> Helytelen fejlesztői jelszó! Próbálja újra.
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    } else {
-      document.body.style.overflow = '';
-      stagingHtml = `
-        <div class="dev-unlocked-floating-badge" id="dev-lock-again-btn" title="Kattintson ide a fejlesztői előnézet újrazárolásához">
-          <i class="fa-solid fa-unlock-keyhole"></i> Fejlesztői előnézet aktív &bull; Zárolás
-        </div>
-      `;
-    }
-  } else {
-    document.body.style.overflow = '';
-  }
+  document.body.style.overflow = '';
 
   // Megakadályozzuk az ismételt belépési animációkat (villanást) a második rendernél
   if (window._hasRenderedOnce) {
@@ -708,13 +665,31 @@ function render() {
     </main>
     ${renderFooter()}
     ${renderCookieBanner()}
-    ${stagingHtml}
   `;
 
   attachEventListeners();
   initScrollObserver();
   initParallaxScroll();
   updatePageSeoMeta();
+  updateJobPostingSchema();
+}
+
+// Ha nincs aktív álláshirdetés, a JobPosting strukturált adat is kikerül az oldalról,
+// hogy a Google ne hirdessen már betöltött / inaktív pozíciót.
+let _originalLdJson = null;
+function updateJobPostingSchema() {
+  const el = document.querySelector('script[type="application/ld+json"]');
+  if (!el) return;
+  if (_originalLdJson === null) _originalLdJson = el.textContent;
+  try {
+    const data = JSON.parse(_originalLdJson);
+    if (getActiveJobs(state.posts).length === 0 && Array.isArray(data['@graph'])) {
+      data['@graph'] = data['@graph'].filter(node => node['@type'] !== 'JobPosting');
+    }
+    el.textContent = JSON.stringify(data);
+  } catch (err) {
+    console.warn('JobPosting schema update skipped:', err);
+  }
 }
 
 function updatePageSeoMeta() {
@@ -1362,6 +1337,7 @@ function attachEventListeners() {
 
       // 2. Search in posts / career / products
       const matchedPosts = state.posts.filter(post => {
+        if (post.type === 'career' && !isJobActive(post)) return false;
         return normalizeStr(post.title).includes(normalizedQuery) ||
                normalizeStr(post.excerpt).includes(normalizedQuery) ||
                normalizeStr(post.content).includes(normalizedQuery) ||
@@ -1508,38 +1484,65 @@ function attachEventListeners() {
     });
   });
 
-  // Admin Login form submit
+  // Admin belépés (Supabase Auth: e-mail cím + jelszó). A jelszó nincs a kódban, a hitelesítést a szerver végzi.
   const loginForm = document.getElementById('admin-login-form');
   if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
+    loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const passInput = document.getElementById('admin-password');
-      const pass = passInput ? passInput.value : '';
-      if (!pass.trim()) {
-        showToast('Kérjük, írja be az adminisztrátori jelszót a belépéshez!', 'error', 'Hiányzó jelszó');
+      const email = (document.getElementById('admin-email')?.value || '').trim();
+      const pass = document.getElementById('admin-password')?.value || '';
+      if (!email) {
+        showToast('Kérjük, adja meg a belépéshez használt e-mail címét!', 'error', 'Hiányzó e-mail cím');
         return;
       }
-      if (pass === 'MoRa!b18jA') {
-        state.isLoggedIn = true;
-        sessionStorage.setItem('demotrade_admin_logged_in', 'true');
-        setPageState('admin', null, true);
-        render();
-        showToast('Sikeres belépés az Admin Panelre!', 'success', 'Üdvözöljük!');
-      } else {
-        showToast('A megadott adminisztrátori jelszó helytelen. Kérjük, ellenőrizze a beírt karaktereket a szem ikonra kattintva!', 'error', 'Hibás jelszó');
+      if (!pass) {
+        showToast('Kérjük, írja be a jelszavát a belépéshez!', 'error', 'Hiányzó jelszó');
+        return;
       }
+
+      const submitBtn = loginForm.querySelector('button[type="submit"]');
+      const origBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Belépés...';
+      }
+
+      const result = await adminSignIn(email, pass);
+
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = origBtnHtml;
+      }
+
+      if (!result.ok) {
+        showToast(result.message, 'error', 'Sikertelen belépés');
+        const passField = document.getElementById('admin-password');
+        if (passField) {
+          passField.value = '';
+          passField.focus();
+        }
+        return;
+      }
+
+      state.isLoggedIn = true;
+      lastUserActivity = Date.now();
+      setPageState('admin', null, true);
+      render();
+      showToast('Sikeres belépés az Admin Panelre!', 'success', 'Üdvözöljük!');
     });
   }
 
   // Admin Logout button
   const logoutBtn = document.getElementById('admin-logout-btn');
   if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
+    logoutBtn.addEventListener('click', async () => {
+      await adminSignOut();
       state.isLoggedIn = false;
-      sessionStorage.removeItem('demotrade_admin_logged_in');
+      state.editingPostId = null;
+      state.editingStaffId = null;
       setPageState('home', null, true);
-      showToast('Kijelentkezve.');
       render();
+      showToast('Sikeresen kijelentkezett.');
     });
   }
 
@@ -1812,6 +1815,12 @@ function attachEventListeners() {
   const editorFileInput = document.getElementById('editor-image-file-input');
 
   if (editorArea) {
+    // Enter = új <p> bekezdés; a formázás CSS-alapú, így a szövegszín mentés után sem vész el
+    try {
+      document.execCommand('defaultParagraphSeparator', false, 'p');
+      document.execCommand('styleWithCSS', false, true);
+    } catch (err) { /* régi böngésző: marad az alapértelmezett */ }
+
     // Automatikus formázás-egységesítés beillesztéskor (Word, Excel, PDF, Apple Pages, Web)
     editorArea.addEventListener('paste', (e) => {
       e.preventDefault();
@@ -1887,18 +1896,6 @@ function attachEventListeners() {
       formatSelect.addEventListener('change', (e) => {
         const tag = e.target.value;
         document.execCommand('formatBlock', false, `<${tag}>`);
-        editorArea.focus();
-      });
-    }
-
-    // Font Size (1-7) dropdown handler
-    const fontSizeSelect = document.getElementById('editor-fontsize-select');
-    if (fontSizeSelect) {
-      fontSizeSelect.addEventListener('change', (e) => {
-        const size = e.target.value;
-        if (size) {
-          document.execCommand('fontSize', false, size);
-        }
         editorArea.focus();
       });
     }
@@ -2312,65 +2309,54 @@ function attachEventListeners() {
     });
   }
 
-  // Content Type Selector Toggle in Admin Form
+  // Admin lapfülek (Tartalmak / Munkatársak)
+  document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.getAttribute('data-admin-tab');
+      if (tab && tab !== state.adminTab) {
+        state.adminTab = tab;
+        render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+  });
+
+  // Tartalomtípus (Blog / Álláshirdetés / Termék) váltása: az űrlap mindig üresen töltődik újra
+  // az új típushoz, így a korábban szerkesztésre megnyitott tartalom nem "ragad" be.
+  const postFormEl = document.getElementById('admin-post-form');
   document.querySelectorAll('input[name="post-type"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
+    radio.addEventListener('change', async (e) => {
       const type = e.target.value;
-      document.querySelectorAll('.type-pill').forEach(pill => {
-        pill.classList.toggle('active', pill.querySelector('input').value === type);
-      });
+      const prevType = (postFormEl && postFormEl.dataset.currentType) || 'blog';
+      if (type === prevType) return;
 
-      const careerFields = document.getElementById('career-extra-fields');
-      const prodFields = document.getElementById('product-extra-fields');
-      const titleLabel = document.getElementById('label-post-title');
-      const titleInput = document.getElementById('post-title');
-      const catInput = document.getElementById('post-category');
-      const catCustomInput = document.getElementById('post-category-custom');
-      const imgHiddenInput = document.getElementById('post-image');
-
-      if (careerFields) careerFields.style.display = type === 'career' ? 'grid' : 'none';
-      if (prodFields) prodFields.style.display = type === 'product' ? 'grid' : 'none';
-
-      // Frissítjük a kategória legördülő opciókat és az alapértelmezett kiválasztást minden fülváltáskor!
-      const defaultCatByType = {
-        blog: 'Híreink',
-        career: 'Szaktanácsadás',
-        product: 'Gyümölcsfa oltványok'
-      };
-      const optionsForType = CATEGORY_OPTIONS_BY_TYPE[type] || CATEGORY_OPTIONS_BY_TYPE.blog;
-      const targetDefaultCat = defaultCatByType[type] || 'Híreink';
-
-      if (catInput && catInput.tagName === 'SELECT') {
-        catInput.innerHTML = optionsForType.map(cat =>
-          `<option value="${cat}" ${cat === targetDefaultCat ? 'selected' : ''}>${cat}</option>`
-        ).join('') + `<option value="__custom__">+ Egyéb (saját kategória megadása)...</option>`;
-        catInput.value = targetDefaultCat;
-      } else if (catInput) {
-        catInput.value = targetDefaultCat;
-      }
-
-      if (catCustomInput) {
-        catCustomInput.style.display = 'none';
-        catCustomInput.value = '';
-      }
-
-      // Ha még nem töltött fel saját képet, a típusnak megfelelő alapértelmezett képet állítjuk be
-      if (imgHiddenInput && !imgHiddenInput.value.startsWith('data:image') && !state.editingPostId) {
-        imgHiddenInput.value = type === 'product' ? '/images/gyumolcsfa_oltvanyok.jpg' : (type === 'career' ? '/images/karrier_csapat.jpg' : '/images/hero.png');
-      }
-
-      if (titleLabel && titleInput) {
-        if (type === 'career') {
-          titleLabel.textContent = 'Pozíció Megnevezése *';
-          titleInput.placeholder = 'Pl. Mezőgazdasági Szaktanácsadó...';
-        } else if (type === 'product') {
-          titleLabel.textContent = 'Termék / Oltvány Neve *';
-          titleInput.placeholder = 'Pl. Jonagold Alma Oltvány (M9)...';
-        } else {
-          titleLabel.textContent = 'Cikk Címe *';
-          titleInput.placeholder = 'Pl. Növényvédelmi előrejelzés...';
+      // Új (nem szerkesztett) tartalomnál csak akkor kérdezünk rá, ha már írtak bele valamit
+      if (!state.editingPostId) {
+        const typedSomething = Boolean(
+          document.getElementById('post-title')?.value.trim() ||
+          document.getElementById('post-excerpt')?.value.trim() ||
+          (document.getElementById('post-content-editor')?.textContent || '').trim() ||
+          (document.getElementById('post-image')?.value || '').startsWith('data:image')
+        );
+        if (typedSomething) {
+          const ok = await showModalConfirm(
+            'A típus váltásakor a már beírt szöveg és a kiválasztott kép törlődik, és üres űrlap töltődik be. Folytatja?',
+            'Beírt tartalom törlése'
+          );
+          if (!ok) {
+            // vissza az előző típusra
+            document.querySelectorAll('input[name="post-type"]').forEach(r => { r.checked = r.value === prevType; });
+            document.querySelectorAll('.type-pill').forEach(pill => {
+              pill.classList.toggle('active', pill.querySelector('input').value === prevType);
+            });
+            return;
+          }
         }
       }
+
+      state.editingPostId = null;
+      state.adminNewType = type;
+      render();
     });
   });
 
@@ -2686,7 +2672,9 @@ function attachEventListeners() {
       const jobType = document.getElementById('job-type-field')?.value.trim();
       const deadline = document.getElementById('job-deadline')?.value.trim();
       const price = document.getElementById('prod-price')?.value.trim();
-      const badge = document.getElementById('prod-badge')?.value.trim();
+      const badge = type === 'career'
+        ? (document.getElementById('job-active-checkbox')?.checked === false ? JOB_INACTIVE_MARK : JOB_ACTIVE_MARK)
+        : document.getElementById('prod-badge')?.value.trim();
 
       if (!title) {
         showToast('Kérjük, adja meg a bejegyzés címét / megnevezését!', 'error', 'Hiányzó cím');
@@ -2703,25 +2691,25 @@ function attachEventListeners() {
         return;
       }
 
-      // If a new image was selected (base64 data URL), upload it to Supabase Pro Storage
+      // Új kép: a bejelentkezett admin saját jogával töltjük fel közvetlenül a Supabase tárolóba
+      // (nincs külön "feltöltő végpont" és nincs titkos kulcs a kódban).
       if (image && image.startsWith('data:image')) {
-        showToast('Kép feltöltése a Supabase felhőtárhelyre...', 'info');
+        showToast('Kép feltöltése folyamatban...', 'info');
         try {
-          const upRes = await fetch('/api/upload-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              imageBase64: image,
-              filename: title || 'post-image',
-              folder: type === 'product' ? 'termekek' : (type === 'career' ? 'karrier' : 'blog')
-            })
-          });
-          const upData = await upRes.json();
-          if (upRes.ok && upData.success && upData.publicUrl) {
-            image = upData.publicUrl;
-          }
+          const imgBlob = await (await fetch(image)).blob();
+          const imgExt = imgBlob.type.includes('png') ? 'png' : (imgBlob.type.includes('webp') ? 'webp' : 'jpg');
+          const imgFolder = type === 'product' ? 'termekek' : (type === 'career' ? 'karrier' : 'blog');
+          const imgName = normalizeStr(title || 'post-image').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 40) || 'upload';
+          const storagePath = imgFolder + '/' + Date.now() + '-' + imgName + '.' + imgExt;
+
+          const { error: upErr } = await supabase.storage
+            .from('webpage-images')
+            .upload(storagePath, imgBlob, { contentType: imgBlob.type || 'image/jpeg', upsert: false });
+          if (upErr) throw upErr;
+
+          image = supabase.storage.from('webpage-images').getPublicUrl(storagePath).data.publicUrl;
         } catch (upErr) {
-          console.warn('Image upload to Supabase notice (fallback to local data):', upErr);
+          console.warn('Kép feltöltési figyelmeztetés (a kép a bejegyzésben helyben marad):', upErr);
         }
       }
 
@@ -2749,8 +2737,8 @@ function attachEventListeners() {
           }
           return p;
         });
-        savePosts(updatedPosts, savedPostObj);
-        showToast('Tartalom sikeresen frissítve a Supabase felhőben!');
+        const savedOk = await savePosts(updatedPosts, savedPostObj);
+        reportSaveResult(savedOk, 'A módosítások mentve lettek, a változás megjelent a weboldalon.', 'Mentve');
       } else {
         const prefix = type === 'career' ? 'job-' : (type === 'product' ? 'prod-' : 'post-');
         savedPostObj = {
@@ -2769,8 +2757,8 @@ function attachEventListeners() {
           price,
           badge
         };
-        savePosts([savedPostObj, ...state.posts], savedPostObj);
-        showToast('Új bejegyzés sikeresen közzétéve a Supabase felhőben!');
+        const savedOk = await savePosts([savedPostObj, ...state.posts], savedPostObj);
+        reportSaveResult(savedOk, 'Az új bejegyzés sikeresen közzétéve a weboldalon.', 'Közzétéve');
       }
 
       // Facebook Poszt közzététele a háttérben, ha be volt pipálva
@@ -2786,9 +2774,13 @@ function attachEventListeners() {
             fbImageUrl = window.location.origin + fbImageUrl;
           }
 
+          const adminToken = await getAdminAccessToken();
           const fbRes = await fetch('/api/facebook-post', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + (adminToken || '')
+            },
             body: JSON.stringify({
               message: fbMessageText,
               imageUrl: fbImageUrl,
@@ -2807,14 +2799,35 @@ function attachEventListeners() {
           }
         } catch (fbErr) {
           console.error('Facebook posting fetch error:', fbErr);
-          showToast('Nem sikerült kapcsolatot létesíteni a Facebook API-val.', 'error');
+          showToast('Nem sikerült kapcsolatot létesíteni a Facebookkal. A bejegyzés a weboldalon megjelent, a Facebook-posztot kérjük kézzel tegye közzé.', 'error');
         }
       }
 
       state.editingPostId = null;
+      state.adminNewType = type;
       render();
     });
   }
+
+  // Admin Edit button
+  document.querySelectorAll('.toggle-job-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      const job = state.posts.find(p => p.id === id);
+      if (!job) return;
+      const nowActive = isJobActive(job);
+      const updatedJob = { ...job, badge: nowActive ? JOB_INACTIVE_MARK : JOB_ACTIVE_MARK };
+      savePosts(state.posts.map(p => (p.id === id ? updatedJob : p)), updatedJob);
+      render();
+      showToast(
+        nowActive
+          ? 'A hirdetés inaktív lett: a Karrier oldalon most a „Jelenleg nincs szabad pozíciónk” felirat látszik. A szöveg megmaradt, bármikor újra aktiválható.'
+          : 'A hirdetés újra aktív, megjelent a Karrier oldalon.',
+        'success',
+        nowActive ? 'Hirdetés inaktiválva' : 'Hirdetés aktiválva'
+      );
+    });
+  });
 
   // Admin Edit button
   document.querySelectorAll('.edit-post-btn').forEach(btn => {
@@ -2844,36 +2857,31 @@ function attachEventListeners() {
       );
       if (confirmed) {
         const filtered = state.posts.filter(p => p.id !== id);
-        savePosts(filtered);
+        await savePosts(filtered);
 
-        // Delete from Supabase
-        supabase.from('web_posts').delete().eq('id', id).then(({ error }) => {
-          if (error) console.warn('Supabase delete notice:', error.message);
-        });
+        // Törlés a közös tárolóból is
+        let removedOnline = true;
+        try {
+          const { error } = await supabase.from('web_posts').delete().eq('id', id);
+          if (error) {
+            console.warn('Post delete notice:', error.message);
+            removedOnline = false;
+          }
+        } catch (err) {
+          console.warn('Post delete notice:', err);
+          removedOnline = false;
+        }
 
         if (state.editingPostId === id) state.editingPostId = null;
         render();
-        showToast('A kiválasztott bejegyzés sikeresen törölve lett!', 'success', 'Törölve');
+        if (removedOnline) {
+          showToast('A kiválasztott bejegyzés törölve lett.', 'success', 'Törölve');
+        } else {
+          showToast('A bejegyzés ebben a böngészőben törlődött, de a weboldalról nem sikerült eltávolítani, ezért a látogatók még láthatják. Kérjük, próbálja újra, vagy értesítse a weboldal készítőjét.', 'error', 'A törlés nem sikerült');
+        }
       }
     });
   });
-
-  // Admin Reset posts button
-  const resetBtn = document.getElementById('reset-posts-btn');
-  if (resetBtn) {
-    resetBtn.addEventListener('click', async () => {
-      const confirmed = await showModalConfirm(
-        'Biztosan visszaállítja az alapértelmezett cikkeket, állásokat és termékeket?',
-        'Alapállapot visszaállítása'
-      );
-      if (confirmed) {
-        savePosts(INITIAL_POSTS);
-        state.editingPostId = null;
-        render();
-        showToast('Az alapértelmezett bejegyzések és termékek sikeresen visszaállítva!', 'success', 'Alapállapot visszaállítva');
-      }
-    });
-  }
 
   // ==========================================
   // ADMIN: MUNKATÁRSAK KEZELÉSE
@@ -2886,20 +2894,12 @@ function attachEventListeners() {
       showToast(successMsg, 'success', successTitle);
     } else {
       showToast(
-        'A változtatás ebben a böngészőben elmentődött, de a közös adatbázisba (Supabase `web_staff` tábla) még nem sikerült írni, ezért más gépen egyelőre nem látszik. Kérjük, futtassa le egyszer a `supabase_web_staff.sql` fájlt a Supabase SQL Editorban.',
+        'A változtatás ebben a böngészőben elmentődött, de a weboldalra (a közös tárolóba) még nem sikerült feltölteni, ezért a látogatók és más gépek még nem látják. Kérjük, értesítse a weboldal készítőjét.',
         'warning',
         'Mentés csak helyben történt'
       );
     }
   };
-
-  const jumpToStaffBtn = document.getElementById('jump-to-staff-btn');
-  if (jumpToStaffBtn) {
-    jumpToStaffBtn.addEventListener('click', () => {
-      const sec = document.getElementById('admin-staff-section');
-      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }
 
   const staffForm = document.getElementById('admin-staff-form');
   if (staffForm) {
@@ -2989,62 +2989,82 @@ function attachEventListeners() {
     });
   });
 
-  const resetStaffBtn = document.getElementById('reset-staff-btn');
-  if (resetStaffBtn) {
-    resetStaffBtn.addEventListener('click', async () => {
-      const confirmed = await showModalConfirm(
-        'Biztosan visszaállítja az eredeti munkatársi névsort? Az Ön által végzett összes változtatás elvész.',
-        'Névsor visszaállítása'
-      );
-      if (confirmed) {
-        await persistStaff(INITIAL_STAFF.map(s => ({ ...s })), 'Az eredeti munkatársi névsor visszaállítva.', 'Névsor visszaállítva');
+}
+
+// --- AUTOMATIKUS KIJELENTKEZÉS TÉTLENSÉG ESETÉN (10 perc) ---
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 perc tétlenség
+let lastUserActivity = Date.now();
+let lastActivityResetThrottle = 0;
+let inactivityIntervalId = null;
+
+function recordUserActivity() {
+  const now = Date.now();
+  if (now - lastActivityResetThrottle > 1000) {
+    lastActivityResetThrottle = now;
+    lastUserActivity = now;
+  }
+}
+
+async function handleAutoLogout() {
+  if (!state.isLoggedIn) return;
+  await adminSignOut();
+  state.isLoggedIn = false;
+  state.editingPostId = null;
+  state.editingStaffId = null;
+  if (state.activePage === 'admin') {
+    render();
+  }
+  showToast(
+    'Biztonsági okokból 10 perc tétlenség után a rendszer automatikusan kijelentkeztette.',
+    'info',
+    'Automatikus kijelentkezés'
+  );
+}
+
+function checkInactivity() {
+  if (state.isLoggedIn && (Date.now() - lastUserActivity >= INACTIVITY_TIMEOUT_MS)) {
+    handleAutoLogout();
+  }
+}
+
+function initInactivityWatcher() {
+  const activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'input'];
+  activityEvents.forEach((evt) => {
+    window.addEventListener(evt, recordUserActivity, { passive: true });
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkInactivity();
+    }
+  });
+
+  if (!inactivityIntervalId) {
+    inactivityIntervalId = setInterval(checkInactivity, 10000); // 10 másodpercenként ellenőrzi
+  }
+}
+
+// --- ADMIN BEJELENTKEZÉS ÁLLAPOTÁNAK BETÖLTÉSE (Supabase Auth) ---
+// A megjelenítést vezérli; a valódi védelmet az adatbázis jogosultságai (RLS) adják.
+async function initAdminAuth() {
+  const adminUser = await getAdminSession();
+  state.isLoggedIn = Boolean(adminUser);
+  if (state.isLoggedIn) {
+    lastUserActivity = Date.now();
+  }
+  state.authReady = true;
+  if (state.activePage === 'admin') render();
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    const nowAdmin = isAdminUser(session && session.user);
+    if (nowAdmin !== state.isLoggedIn) {
+      state.isLoggedIn = nowAdmin;
+      if (nowAdmin) {
+        lastUserActivity = Date.now();
       }
-    });
-  }
-
-  // --- STAGING GATE VEIL EVENT LISTENERS ---
-  const stagingBackHomeBtn = document.getElementById('staging-back-home-btn');
-  if (stagingBackHomeBtn) {
-    stagingBackHomeBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.body.style.overflow = '';
-      setPageState('home', null, true);
-      render();
-      window.scrollTo(0, 0);
-    });
-  }
-
-  const stagingUnlockForm = document.getElementById('staging-unlock-form');
-  if (stagingUnlockForm) {
-    stagingUnlockForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const pwInput = document.getElementById('staging-password-input');
-      const errBox = document.getElementById('staging-error-msg');
-      const val = pwInput ? pwInput.value.trim() : '';
-
-      if (val === STAGING_DEV_PASSWORD) {
-        sessionStorage.setItem('demotrade_preview_unlocked', 'true');
-        showToast('Fejlesztői hozzáférés feloldva!');
-        render();
-      } else {
-        if (errBox) errBox.style.display = 'block';
-        if (pwInput) {
-          pwInput.classList.add('error');
-          pwInput.focus();
-          pwInput.select();
-        }
-      }
-    });
-  }
-
-  const devLockAgainBtn = document.getElementById('dev-lock-again-btn');
-  if (devLockAgainBtn) {
-    devLockAgainBtn.addEventListener('click', () => {
-      sessionStorage.removeItem('demotrade_preview_unlocked');
-      showToast('Fejlesztői előnézet zárolva.');
-      render();
-    });
-  }
+      if (state.activePage === 'admin') render();
+    }
+  });
 }
 
 // Initial render
@@ -3052,3 +3072,5 @@ initHistoryState();
 render();
 syncPostsFromSupabase();
 syncStaffFromSupabase();
+initAdminAuth();
+initInactivityWatcher();

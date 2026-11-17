@@ -1,7 +1,9 @@
 import { normalizeRichContentHtml } from '../utils/contentNormalizer.js';
+import { getActiveJobs } from '../utils/jobStatus.js';
 
 export function renderCareerPage(posts) {
-  const careerPosts = posts.filter(p => p.type === 'career');
+  // Csak az aktív álláshirdetések jelennek meg a nyilvános oldalon
+  const careerPosts = getActiveJobs(posts);
   const todayStr = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\s/g, '');
 
   return `
@@ -87,7 +89,7 @@ export function renderCareerPage(posts) {
               <div class="career-empty-icon">
                 <i class="fa-solid fa-user-check"></i>
               </div>
-              <h3>Jelenleg nincs konkrét meghirdetett pozíciónk</h3>
+              <h3>Jelenleg nincs szabad pozíciónk</h3>
               <p>
                 Ennek ellenére folyamatosan várjuk tehetséges, elhivatott agrármérnökök, növényorvosok és agrár-adminisztrációs szakemberek jelentkezését.
                 Küldje el önéletrajzát nyitott adatbázisunkba, és új lehetőség nyílásakor azonnal felvesszük Önnel a kapcsolatot!

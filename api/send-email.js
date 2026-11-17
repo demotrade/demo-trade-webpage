@@ -35,13 +35,22 @@ export default async function handler(req, res) {
   }
 
   try {
+    // A jelszó SOHA nem lehet a kódban: kizárólag a Vercel környezeti változóból (SMTP_PASS) jön.
+    if (!process.env.SMTP_PASS) {
+      console.error('Hiányzik a SMTP_PASS környezeti változó, az e-mail küldés le van tiltva.');
+      return res.status(500).json({
+        success: false,
+        message: 'Az e-mail küldés jelenleg nem elérhető. Kérjük, keressen minket telefonon: +36 30 346 2848.'
+      });
+    }
+
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
       auth: {
         user: process.env.SMTP_USER || 'demotradekft@gmail.com',
-        pass: process.env.SMTP_PASS || 'cjjxniblpeyetuvm'
+        pass: process.env.SMTP_PASS
       }
     });
 
