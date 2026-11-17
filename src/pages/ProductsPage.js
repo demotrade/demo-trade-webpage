@@ -1,3 +1,5 @@
+import { normalizeRichContentHtml } from '../utils/contentNormalizer.js';
+
 export function renderProductsPage(posts, selectedCategory = 'all', searchTerm = '', activeProductId = null) {
   const allProducts = posts.filter(p => p.type === 'product');
 
@@ -146,8 +148,8 @@ export function renderProductsPage(posts, selectedCategory = 'all', searchTerm =
                 <img src="${activeProduct.image || '/images/gyumolcsfa_oltvanyok.jpg'}" alt="${activeProduct.title}" class="product-modal-img" />
               </div>
 
-              <div class="product-modal-content-rich">
-                ${activeProduct.content}
+              <div class="product-modal-content-rich article-content">
+                ${normalizeRichContentHtml(activeProduct.content)}
               </div>
             </div>
 

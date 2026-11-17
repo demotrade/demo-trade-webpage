@@ -1,4 +1,5 @@
 import { renderNotFoundPage } from './NotFoundPage.js';
+import { normalizeRichContentHtml } from '../utils/contentNormalizer.js';
 
 export function renderBlogPage(posts, activePostId, searchTerm = '', selectedCategory = 'all', currentPage = 1) {
   // If an active article is selected, render Single Article view
@@ -26,7 +27,7 @@ export function renderBlogPage(posts, activePostId, searchTerm = '', selectedCat
         <img src="${post.image}" alt="${post.title}" class="article-cover" />
 
         <div class="article-content">
-          ${post.content}
+          ${normalizeRichContentHtml(post.content)}
         </div>
 
         <!-- SHARE BUTTONS -->

@@ -1,3 +1,5 @@
+import { normalizeRichContentHtml } from '../utils/contentNormalizer.js';
+
 export function renderCareerPage(posts) {
   const careerPosts = posts.filter(p => p.type === 'career');
   const todayStr = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\s/g, '');
@@ -124,8 +126,8 @@ export function renderCareerPage(posts) {
                       </div>
                     ` : ''}
                     <div class="career-job-details">
-                      <div class="career-content-render">
-                        ${job.content}
+                      <div class="career-content-render article-content">
+                        ${normalizeRichContentHtml(job.content)}
                       </div>
                     </div>
                   </div>

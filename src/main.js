@@ -15,6 +15,7 @@ import { renderPrivacyPage } from './pages/PrivacyPage.js';
 import { renderNotFoundPage } from './pages/NotFoundPage.js';
 import { renderCookieBanner } from './components/CookieBanner.js';
 import { supabase } from './utils/supabaseClient.js';
+import { normalizeRichContentHtml } from './utils/contentNormalizer.js';
 
 // --- STATE MANAGEMENT ---
 let state = {
@@ -1729,6 +1730,46 @@ function attachEventListeners() {
   const editorFileInput = document.getElementById('editor-image-file-input');
 
   if (editorArea) {
+    // Automatikus formázás-egységesítés beillesztéskor (Word, Excel, PDF, Apple Pages, Web)
+    editorArea.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const clipboard = e.clipboardData || window.clipboardData;
+      if (!clipboard) return;
+
+      const htmlData = clipboard.getData('text/html');
+      const textData = clipboard.getData('text/plain');
+
+      let cleanedHtml = '';
+      if (htmlData && htmlData.trim()) {
+        cleanedHtml = normalizeRichContentHtml(htmlData);
+      } else if (textData && textData.trim()) {
+        // Sima szöveg beillesztésekor a bekezdéseket sorkizárt <p> tagekké alakítjuk
+        cleanedHtml = textData
+          .split(/\r?\n\s*\r?\n/)
+          .map(block => block.replace(/\r?\n/g, ' ').trim())
+          .filter(Boolean)
+          .map(p => `<p style="text-align: justify;">${p}</p>`)
+          .join('');
+      }
+
+      if (cleanedHtml) {
+        document.execCommand('insertHTML', false, cleanedHtml);
+      }
+    });
+
+    const normalizeBtn = document.getElementById('editor-normalize-btn');
+    if (normalizeBtn) {
+      normalizeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        editorArea.innerHTML = normalizeRichContentHtml(editorArea.innerHTML);
+        showToast(
+          'A szöveg és a táblázatok formázása sikeresen egységesítve lett (Montserrat betűtípus, sorkizárt bekezdések, középre igazított táblázatok)!',
+          'info',
+          'Formázás egységesítve'
+        );
+      });
+    }
+
     document.querySelectorAll('.editor-btn[data-cmd]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.preventDefault();
@@ -1747,6 +1788,10 @@ function attachEventListeners() {
             }
             document.execCommand(cmd, false, url);
           }
+        } else if (cmd === 'removeFormat') {
+          document.execCommand(cmd, false, val);
+          editorArea.innerHTML = normalizeRichContentHtml(editorArea.innerHTML);
+          editorArea.focus();
         } else {
           document.execCommand(cmd, false, val);
           editorArea.focus();
@@ -2274,7 +2319,7 @@ function attachEventListeners() {
       author = customPost.author || 'Demo-Trade Kft.';
       image = customPost.image || '/images/hero.png';
       excerpt = customPost.excerpt || '';
-      content = customPost.content || '';
+      content = normalizeRichContentHtml(customPost.content || '');
       if (type === 'career') {
         metaExtra = `${customPost.location || ''} &bull; ${customPost.jobType || ''}`;
       } else if (type === 'product') {
@@ -2287,7 +2332,8 @@ function attachEventListeners() {
       author = document.getElementById('post-author')?.value.trim() || 'Moravszki Gábor';
       image = document.getElementById('post-image')?.value.trim() || (type === 'product' ? '/images/gyumolcsfa_oltvanyok.jpg' : (type === 'career' ? '/images/karrier_csapat.jpg' : '/images/hero.png'));
       excerpt = document.getElementById('post-excerpt')?.value.trim() || '';
-      content = editorArea ? editorArea.innerHTML.trim() : document.getElementById('post-content')?.value.trim();
+      const rawContent = editorArea ? editorArea.innerHTML.trim() : document.getElementById('post-content')?.value.trim();
+      content = normalizeRichContentHtml(rawContent);
 
       if (type === 'career') {
         const loc = document.getElementById('job-location')?.value.trim();
@@ -2549,7 +2595,8 @@ function attachEventListeners() {
       const author = document.getElementById('post-author')?.value.trim() || 'Moravszki Gábor';
       let image = document.getElementById('post-image')?.value.trim() || (type === 'product' ? '/images/gyumolcsfa_oltvanyok.jpg' : (type === 'career' ? '/images/karrier_csapat.jpg' : '/images/hero.png'));
       const excerpt = document.getElementById('post-excerpt')?.value.trim();
-      const content = editorArea ? editorArea.innerHTML.trim() : document.getElementById('post-content')?.value.trim();
+      const rawContent = editorArea ? editorArea.innerHTML.trim() : document.getElementById('post-content')?.value.trim();
+      const content = normalizeRichContentHtml(rawContent);
       const date = new Date().toLocaleDateString('hu-HU');
 
       // Type-specific extras

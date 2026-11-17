@@ -1341,11 +1341,20 @@ button {
 .article-content {
   max-width: 840px;
   margin: 0 auto;
+  font-family: var(--font-body) !important;
   font-size: 1.05rem;
   line-height: 1.8;
   color: var(--gray-700);
+  text-align: justify;
   word-break: break-word;
   overflow-x: hidden;
+}
+
+/* Fixen Montserrat betűtípus minden bemásolt szövegre is (kivéve FontAwesome ikonokat) */
+.article-content *:not(i):not([class*="fa-"]),
+#post-content-editor *:not(i):not([class*="fa-"]) {
+  font-family: var(--font-body) !important;
+  -webkit-text-stroke: 0px transparent !important;
 }
 
 .article-content *,
@@ -1375,14 +1384,80 @@ button {
   box-shadow: var(--shadow-md);
 }
 
-.article-content table {
+/* TÁBLÁZATOK: középre igazított, modern, egységes megjelenés */
+.article-content table,
+#post-content-editor table {
+  display: table !important;
   width: 100% !important;
-  display: block;
-  overflow-x: auto;
+  max-width: 100% !important;
+  margin: 1.85rem auto !important;
+  border-collapse: collapse !important;
+  background: #ffffff;
+  border: 1.5px solid var(--gray-300) !important;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+
+.article-content table th,
+.article-content table td,
+#post-content-editor table th,
+#post-content-editor table td {
+  width: auto !important;
+  height: auto !important;
+  padding: 0.75rem 0.9rem !important;
+  border: 1px solid var(--gray-300) !important;
+  font-size: 0.94rem !important;
+  line-height: 1.5 !important;
+  color: var(--gray-800) !important;
+  vertical-align: middle !important;
+  text-align: center !important;
+}
+
+.article-content table tr:first-child td,
+.article-content table tr:first-child th,
+#post-content-editor table tr:first-child td,
+#post-content-editor table tr:first-child th {
+  background: var(--primary-light) !important;
+  color: var(--dark) !important;
+  font-weight: 700 !important;
+}
+
+.article-content table tr:nth-child(even) td,
+#post-content-editor table tr:nth-child(even) td {
+  background-color: #f8fafc;
+}
+
+.article-content table p,
+#post-content-editor table p {
+  margin: 0.15rem 0 !important;
+  font-size: 0.94rem !important;
+  line-height: 1.45 !important;
+  text-align: center !important;
+  hyphens: none !important;
+}
+
+@media (max-width: 680px) {
+  .article-content table th,
+  .article-content table td {
+    padding: 0.5rem 0.45rem !important;
+    font-size: 0.82rem !important;
+  }
+  .article-content table p {
+    font-size: 0.82rem !important;
+  }
+}
+
+.article-content > p,
+#post-content-editor > p {
+  margin-bottom: 1.35rem;
+  font-size: 1.05rem !important;
+  line-height: 1.8 !important;
+  text-align: justify;
 }
 
 .article-content p {
-  margin-bottom: 1.4rem;
+  margin-bottom: 1.35rem;
 }
 
 .article-content h2, .article-content h3, .article-content h4 {
@@ -1390,6 +1465,8 @@ button {
   margin-top: 2.2rem;
   margin-bottom: 1rem;
   font-weight: 800;
+  text-align: left !important;
+  hyphens: none !important;
 }
 
 .article-content ul, .article-content ol {
@@ -1399,6 +1476,8 @@ button {
 
 .article-content li {
   margin-bottom: 0.5rem;
+  font-size: 1.05rem;
+  line-height: 1.75;
 }
 
 .article-cover {

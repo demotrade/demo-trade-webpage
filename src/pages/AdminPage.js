@@ -1,3 +1,5 @@
+import { normalizeRichContentHtml } from '../utils/contentNormalizer.js';
+
 export const CATEGORY_OPTIONS_BY_TYPE = {
   blog: [
     'Híreink',
@@ -245,9 +247,11 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
 
           <!-- VISUAL RICH TEXT EDITOR FOR CONTENT -->
           <div class="form-group">
-            <label style="font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+            <label style="font-weight: 700; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.4rem;">
               <span>Részletes Szöveg &amp; Leírás (Formázható Szövegszerkesztő) *</span>
-              <span style="font-size: 0.8rem; font-weight: 400; color: var(--gray-500);">Kijelölve használja a formázó gombokat!</span>
+              <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary); background: var(--primary-light); padding: 0.2rem 0.65rem; border-radius: 999px;">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Alapértelmezett: Montserrat &bull; Sorkizárt &bull; Középre igazított táblázatok
+              </span>
             </label>
 
             <!-- HIDDEN FILE INPUT FOR INLINE EDITOR IMAGES -->
@@ -257,7 +261,7 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
             <div class="editor-toolbar" style="background: var(--gray-100); border: 1px solid var(--gray-300); border-bottom: none; border-radius: var(--radius-md) var(--radius-md) 0 0; padding: 0.6rem 0.8rem; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;">
               <!-- HEADING & FORMAT SELECT -->
               <select id="editor-format-select" class="editor-select" title="Bekezdés stílus (Főcím / Alcím / Normál)" style="height: 32px; font-size: 0.85rem; border: 1px solid var(--gray-300); border-radius: 4px; padding: 0 6px; background: #fff; cursor: pointer;">
-                <option value="p">Normál bekezdés</option>
+                <option value="p">Normál bekezdés (Montserrat)</option>
                 <option value="h2">Nagy Alcím (H2)</option>
                 <option value="h3">Közepes Alcím (H3)</option>
                 <option value="h4">Kis Alcím (H4)</option>
@@ -265,7 +269,7 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
 
               <!-- FONT SIZE SELECT -->
               <select id="editor-fontsize-select" class="editor-select" title="Betűméret beállítása" style="height: 32px; font-size: 0.85rem; border: 1px solid var(--gray-300); border-radius: 4px; padding: 0 6px; background: #fff; cursor: pointer;">
-                <option value="">Betűméret</option>
+                <option value="">Alapértelmezett méret</option>
                 <option value="2">Kisebb (13px)</option>
                 <option value="3">Normál (16px)</option>
                 <option value="4">Közepes (18px)</option>
@@ -283,7 +287,8 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
 
               <div style="width: 1px; height: 22px; background: var(--gray-300); margin: 0 0.2rem;"></div>
 
-              <!-- ALIGNMENT -->
+              <!-- ALIGNMENT (including Justify / Sorkizárt) -->
+              <button type="button" class="editor-btn" data-cmd="justifyFull" title="Sorkizárt igazítás (Alapértelmezett)"><i class="fa-solid fa-align-justify"></i></button>
               <button type="button" class="editor-btn" data-cmd="justifyLeft" title="Balra zárás"><i class="fa-solid fa-align-left"></i></button>
               <button type="button" class="editor-btn" data-cmd="justifyCenter" title="Középre zárás"><i class="fa-solid fa-align-center"></i></button>
               <button type="button" class="editor-btn" data-cmd="justifyRight" title="Jobbra zárás"><i class="fa-solid fa-align-right"></i></button>
@@ -313,16 +318,17 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
               <!-- LINK & IMAGE UPLOAD & CLEAR -->
               <button type="button" class="editor-btn" data-cmd="createLink" title="Hivatkozás / Link beszúrása"><i class="fa-solid fa-link"></i> Link</button>
               <button type="button" class="editor-btn" id="editor-insert-img-btn" style="background: #e6f4ea; border-color: var(--primary); color: var(--primary); font-weight: 700;" title="Kép feltöltése a számítógépről"><i class="fa-solid fa-image"></i> + Kép feltöltése</button>
-              <button type="button" class="editor-btn" data-cmd="removeFormat" title="Formázás törlése"><i class="fa-solid fa-remove-format"></i></button>
+              <button type="button" class="editor-btn" id="editor-normalize-btn" title="Bemásolt szöveg és táblázat formázásának egységesítése (Montserrat + Sorkizárt)"><i class="fa-solid fa-wand-magic-sparkles"></i> Egységesítés</button>
+              <button type="button" class="editor-btn" data-cmd="removeFormat" title="Kijelölt formázás törlése"><i class="fa-solid fa-remove-format"></i></button>
             </div>
 
             <!-- EDITABLE WYSIWYG AREA -->
-            <div id="post-content-editor" contenteditable="true" class="form-control" style="min-height: 280px; max-height: 550px; overflow-y: auto; background: #ffffff; border-radius: 0 0 var(--radius-md) var(--radius-md); padding: 1.2rem; line-height: 1.7;" placeholder="Írja vagy illessze ide a részletes leírást...">
-              ${editingPost ? editingPost.content : ''}
+            <div id="post-content-editor" contenteditable="true" class="form-control article-content" style="max-width: 100%; min-height: 280px; max-height: 550px; overflow-y: auto; background: #ffffff; border-radius: 0 0 var(--radius-md) var(--radius-md); padding: 1.4rem; font-family: var(--font-body); font-size: 1.05rem; line-height: 1.8; text-align: justify;" placeholder="Írja vagy illessze ide a részletes leírást...">
+              ${editingPost ? normalizeRichContentHtml(editingPost.content) : ''}
             </div>
 
             <!-- HIDDEN TEXTAREA FOR FORM SUBMISSION -->
-            <textarea id="post-content" style="display: none;">${editingPost ? editingPost.content : ''}</textarea>
+            <textarea id="post-content" style="display: none;">${editingPost ? normalizeRichContentHtml(editingPost.content) : ''}</textarea>
           </div>
 
           <!-- ========================================== -->
