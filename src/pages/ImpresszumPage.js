@@ -1,4 +1,18 @@
-export function renderImpresszumPage() {
+import { INITIAL_STAFF } from '../data/initialStaff.js';
+
+export function renderImpresszumPage(staffList = INITIAL_STAFF) {
+  const activeStaff = Array.isArray(staffList) && staffList.length > 0 ? staffList : INITIAL_STAFF;
+  // Deduplicate by person name so staff working in multiple offices appear once in Impresszum
+  const uniqueStaff = [];
+  const seenNames = new Set();
+  for (const person of activeStaff) {
+    const key = (person.name || '').trim().toLowerCase();
+    if (key && !seenNames.has(key)) {
+      seenNames.add(key);
+      uniqueStaff.push(person);
+    }
+  }
+
   return `
     <section class="section page-section" style="background: #f8fafc; padding: calc(80px + 2.5rem) 0 5rem; min-height: 70vh;">
       <div class="container" style="max-width: 860px;">
@@ -49,46 +63,16 @@ export function renderImpresszumPage() {
             <i class="fa-solid fa-phone" style="color: var(--primary); margin-right: 0.6rem;"></i>Telefonszámok
           </h3>
           <div class="impresszum-contacts-grid">
-            <div class="impresszum-person">
-              <strong>Moravszki Gábor</strong>
-              <span>ügyvezető, növényorvos</span>
-              <a href="tel:+36303462848">+36-30-346-2848</a>
-            </div>
-            <div class="impresszum-person">
-              <strong>Sápi Imre</strong>
-              <span>irodavezető, szaktanácsadó</span>
-              <a href="tel:+36305597376">+36-30-559-7376</a>
-            </div>
-            <div class="impresszum-person">
-              <strong>Pokol Roland</strong>
-              <span>növényorvos, szaktanácsadó</span>
-              <a href="tel:+36305601366">+36-30-560-1366</a>
-            </div>
-            <div class="impresszum-person">
-              <strong>Benke László</strong>
-              <span>szaktanácsadó</span>
-              <a href="tel:+36305571656">+36-30-557-1656</a>
-            </div>
-            <div class="impresszum-person">
-              <strong>Sirola-Kőrizs Tímea</strong>
-              <span>pályázati szaktanácsadó</span>
-              <a href="tel:+36301857844">+36-30-185-7844</a>
-            </div>
-            <div class="impresszum-person">
-              <strong>Ungvári Enikő</strong>
-              <span>szaktanácsadó</span>
-              <a href="tel:+36307867133">+36-30-786-7133</a>
-            </div>
-            <div class="impresszum-person">
-              <strong>Dánielné Musta Kitti</strong>
-              <span>szaktanácsadó</span>
-              <a href="tel:+36304402705">+36-30-440-2705</a>
-            </div>
-            <div class="impresszum-person">
-              <strong>Kozák Dávid</strong>
-              <span>szaktanácsadó</span>
-              <a href="tel:+36205484948">+36-20-548-4948</a>
-            </div>
+            ${uniqueStaff.map(person => {
+              const cleanTel = (person.phone || '').replace(/[^\d+]/g, '');
+              return `
+                <div class="impresszum-person">
+                  <strong>${person.name}</strong>
+                  <span>${person.role}</span>
+                  ${person.phone ? `<a href="tel:${cleanTel}">${person.phone}</a>` : ''}
+                </div>
+              `;
+            }).join('')}
           </div>
 
           <h3 style="font-size: 1.25rem; margin: 2.5rem 0 1.2rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-200);">

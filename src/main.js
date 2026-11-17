@@ -32,7 +32,9 @@ let state = {
   productSearch: '',
   activeProductId: null,
   adminTableFilter: 'all',
-  selectedCvAttachment: null
+  selectedCvAttachment: null,
+  staff: loadStaff(),
+  editingStaffId: null
 };
 
 const STAGING_DEV_PASSWORD = 'MoRa!b18jA';
@@ -74,6 +76,85 @@ async function syncPostsFromSupabase() {
   } catch (err) {
     console.warn('Supabase posts sync info (fallback to cache):', err);
   }
+}
+
+// --- MUNKATÁRSAK (STAFF) KEZELÉSE: localStorage cache + Supabase `web_staff` tábla ---
+function loadStaff() {
+  try {
+    const saved = localStorage.getItem('demotrade_staff');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('Staff cache read error:', e);
+  }
+  return INITIAL_STAFF.map(s => ({ ...s }));
+}
+
+function getStaffSignature(list) {
+  return (Array.isArray(list) ? list : [])
+    .map(s => `${s.id}|${s.office}|${s.name}|${s.role}|${s.phone}`)
+    .join('~');
+}
+
+async function syncStaffFromSupabase() {
+  try {
+    const { data, error } = await supabase
+      .from('web_staff')
+      .select('*')
+      .order('sort_order', { ascending: true });
+
+    if (error || !data || data.length === 0) return; // tábla hiányzik / üres: marad a gyorsítótár vagy az alapértelmezett lista
+
+    const incoming = data.map(r => ({ id: r.id, office: r.office, name: r.name, role: r.role, phone: r.phone }));
+    const changed = getStaffSignature(state.staff) !== getStaffSignature(incoming);
+    state.staff = incoming;
+    localStorage.setItem('demotrade_staff', JSON.stringify(incoming));
+
+    const staffPages = ['home', 'contact', 'impresszum', 'admin'];
+    if (changed && staffPages.includes(state.activePage)) {
+      render();
+    }
+  } catch (err) {
+    console.warn('Supabase staff sync info (fallback to cache):', err);
+  }
+}
+
+async function saveStaff(list) {
+  state.staff = list;
+  localStorage.setItem('demotrade_staff', JSON.stringify(list));
+
+  try {
+    const rows = list.map((s, idx) => ({
+      id: s.id,
+      office: s.office,
+      name: s.name,
+      role: s.role,
+      phone: s.phone,
+      sort_order: idx,
+      updated_at: new Date().toISOString()
+    }));
+
+    const { error: upErr } = await supabase.from('web_staff').upsert(rows);
+    if (upErr) throw upErr;
+
+    // A törölt munkatársak eltávolítása az adatbázisból is
+    const keepIds = list.map(s => s.id);
+    const { data: existing } = await supabase.from('web_staff').select('id');
+    const toDelete = (existing || []).map(r => r.id).filter(id => !keepIds.includes(id));
+    if (toDelete.length > 0) {
+      await supabase.from('web_staff').delete().in('id', toDelete);
+    }
+    return true;
+  } catch (err) {
+    console.warn('Supabase staff save notice:', err && err.message ? err.message : err);
+    return false;
+  }
+}
+
+function sanitizeStaffText(value) {
+  return String(value || '').replace(/[<>"]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 function loadPosts() {
@@ -497,17 +578,17 @@ function render() {
   let mainContent = '';
   switch (state.activePage) {
     case 'home':
-      mainContent = renderHomePage(state.posts.filter(p => !p.type || p.type === 'blog'));
+      mainContent = renderHomePage(state.posts.filter(p => !p.type || p.type === 'blog'), state.staff);
       break;
     case 'about':
       // Rólunk is on homepage section
       state.activePage = 'home';
-      mainContent = renderHomePage(state.posts.filter(p => !p.type || p.type === 'blog'));
+      mainContent = renderHomePage(state.posts.filter(p => !p.type || p.type === 'blog'), state.staff);
       break;
     case 'services':
       // Szolgáltatások is on homepage section
       state.activePage = 'home';
-      mainContent = renderHomePage(state.posts.filter(p => !p.type || p.type === 'blog'));
+      mainContent = renderHomePage(state.posts.filter(p => !p.type || p.type === 'blog'), state.staff);
       break;
     case 'career':
     case 'karrier':
@@ -522,17 +603,17 @@ function render() {
       mainContent = renderBlogPage(state.posts.filter(p => !p.type || p.type === 'blog'), state.activePostId, state.searchTerm, state.selectedCategory, state.currentPage);
       break;
     case 'contact':
-      mainContent = renderContactPage();
+      mainContent = renderContactPage(state.staff);
       break;
     case 'impresszum':
-      mainContent = renderImpresszumPage();
+      mainContent = renderImpresszumPage(state.staff);
       break;
     case 'privacy':
     case 'adatkezeles':
       mainContent = renderPrivacyPage();
       break;
     case 'admin':
-      mainContent = renderAdminPage(state.posts, state.isLoggedIn, state.editingPostId, state.adminTableFilter);
+      mainContent = renderAdminPage(state.posts, state.isLoggedIn, state.editingPostId, state.adminTableFilter, state.staff, state.editingStaffId);
       break;
     case 'not-found':
       mainContent = renderNotFoundPage();
@@ -2793,6 +2874,133 @@ function attachEventListeners() {
     });
   }
 
+  // ==========================================
+  // ADMIN: MUNKATÁRSAK KEZELÉSE
+  // ==========================================
+  const persistStaff = async (list, successMsg, successTitle) => {
+    const ok = await saveStaff(list);
+    state.editingStaffId = null;
+    render();
+    if (ok) {
+      showToast(successMsg, 'success', successTitle);
+    } else {
+      showToast(
+        'A változtatás ebben a böngészőben elmentődött, de a közös adatbázisba (Supabase `web_staff` tábla) még nem sikerült írni, ezért más gépen egyelőre nem látszik. Kérjük, futtassa le egyszer a `supabase_web_staff.sql` fájlt a Supabase SQL Editorban.',
+        'warning',
+        'Mentés csak helyben történt'
+      );
+    }
+  };
+
+  const jumpToStaffBtn = document.getElementById('jump-to-staff-btn');
+  if (jumpToStaffBtn) {
+    jumpToStaffBtn.addEventListener('click', () => {
+      const sec = document.getElementById('admin-staff-section');
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  const staffForm = document.getElementById('admin-staff-form');
+  if (staffForm) {
+    staffForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('staff-id')?.value;
+      const office = document.getElementById('staff-office')?.value || 'nyiregyhaza';
+      const name = sanitizeStaffText(document.getElementById('staff-name')?.value);
+      const role = sanitizeStaffText(document.getElementById('staff-role')?.value);
+      const phone = sanitizeStaffText(document.getElementById('staff-phone')?.value);
+
+      if (!name) {
+        showToast('Kérjük, adja meg a munkatárs nevét!', 'error', 'Hiányzó név');
+        return;
+      }
+      if (!role) {
+        showToast('Kérjük, adja meg a munkatárs beosztását!', 'error', 'Hiányzó beosztás');
+        return;
+      }
+      if (!phone || phone.replace(/\D/g, '').length < 8) {
+        showToast('Kérjük, adjon meg érvényes telefonszámot (pl. +36 30 123 4567)!', 'error', 'Hibás telefonszám');
+        return;
+      }
+
+      let updated;
+      if (id) {
+        updated = state.staff.map(s => (s.id === id ? { ...s, office, name, role, phone } : s));
+        await persistStaff(updated, `${name} adatai sikeresen frissítve lettek.`, 'Munkatárs frissítve');
+      } else {
+        updated = [...state.staff, { id: 'staff-' + Date.now(), office, name, role, phone }];
+        await persistStaff(updated, `${name} sikeresen felvéve az irodához.`, 'Munkatárs hozzáadva');
+      }
+    });
+  }
+
+  document.querySelectorAll('.edit-staff-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.editingStaffId = btn.getAttribute('data-id');
+      render();
+      const form = document.getElementById('admin-staff-form');
+      if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  });
+
+  const cancelStaffEditBtn = document.getElementById('cancel-staff-edit-btn');
+  if (cancelStaffEditBtn) {
+    cancelStaffEditBtn.addEventListener('click', () => {
+      state.editingStaffId = null;
+      render();
+    });
+  }
+
+  document.querySelectorAll('.delete-staff-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      const person = state.staff.find(s => s.id === id);
+      if (!person) return;
+      const confirmed = await showModalConfirm(
+        `Biztosan eltávolítja <strong>${person.name}</strong> munkatársat a névsorból? A weboldalon azonnal eltűnik.`,
+        'Munkatárs törlése'
+      );
+      if (confirmed) {
+        const updated = state.staff.filter(s => s.id !== id);
+        await persistStaff(updated, `${person.name} eltávolítva a névsorból.`, 'Munkatárs törölve');
+      }
+    });
+  });
+
+  document.querySelectorAll('.move-staff-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      const id = btn.getAttribute('data-id');
+      const dir = btn.getAttribute('data-dir');
+      const list = [...state.staff];
+      const idx = list.findIndex(s => s.id === id);
+      if (idx < 0) return;
+      const office = list[idx].office;
+      const step = dir === 'up' ? -1 : 1;
+      let j = idx + step;
+      while (j >= 0 && j < list.length && list[j].office !== office) j += step;
+      if (j < 0 || j >= list.length) return;
+      [list[idx], list[j]] = [list[j], list[idx]];
+      state.staff = list;
+      localStorage.setItem('demotrade_staff', JSON.stringify(list));
+      render();
+      saveStaff(list);
+    });
+  });
+
+  const resetStaffBtn = document.getElementById('reset-staff-btn');
+  if (resetStaffBtn) {
+    resetStaffBtn.addEventListener('click', async () => {
+      const confirmed = await showModalConfirm(
+        'Biztosan visszaállítja az eredeti munkatársi névsort? Az Ön által végzett összes változtatás elvész.',
+        'Névsor visszaállítása'
+      );
+      if (confirmed) {
+        await persistStaff(INITIAL_STAFF.map(s => ({ ...s })), 'Az eredeti munkatársi névsor visszaállítva.', 'Névsor visszaállítva');
+      }
+    });
+  }
+
   // --- STAGING GATE VEIL EVENT LISTENERS ---
   const stagingBackHomeBtn = document.getElementById('staging-back-home-btn');
   if (stagingBackHomeBtn) {
@@ -2842,3 +3050,4 @@ function attachEventListeners() {
 initHistoryState();
 render();
 syncPostsFromSupabase();
+syncStaffFromSupabase();

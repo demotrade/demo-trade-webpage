@@ -1,6 +1,6 @@
 import { renderContactSection } from './ContactPage.js';
 
-export function renderHomePage(posts) {
+export function renderHomePage(posts, staffList) {
 
   const latestPosts = posts.slice(0, 3);
   
@@ -336,7 +336,7 @@ export function renderHomePage(posts) {
 
 
     <!-- CONTACT SECTION (At the bottom of Homepage) -->
-    ${renderContactSection()}
+    ${renderContactSection(staffList)}
   `;
 }
 

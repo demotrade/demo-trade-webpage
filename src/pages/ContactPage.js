@@ -1,4 +1,8 @@
-export function renderContactSection() {
+import { INITIAL_STAFF, OFFICES_META } from '../data/initialStaff.js';
+
+export function renderContactSection(staffList = INITIAL_STAFF) {
+  const activeStaff = Array.isArray(staffList) && staffList.length > 0 ? staffList : INITIAL_STAFF;
+
   return `
     <section class="section contact-section reveal-on-scroll fade-in-up" id="kapcsolat" style="background: #ffffff; padding: 5rem 0;">
       <div class="container">
@@ -130,127 +134,46 @@ export function renderContactSection() {
         </div>
 
         <div class="offices-grid">
-          <!-- NYÍREGYHÁZI IRODA -->
-          <div class="office-card reveal-on-scroll slide-in-left">
-            <div class="office-header">
-              <div>
-                <h3>NYÍREGYHÁZI IRODA</h3>
-                <span class="office-tag">Központi Iroda</span>
-              </div>
-            </div>
+          ${OFFICES_META.map(office => {
+            const members = activeStaff.filter(m => m.office === office.id);
+            return `
+              <div class="office-card reveal-on-scroll ${office.animClass}">
+                <div class="office-header">
+                  <div>
+                    <h3>${office.title}</h3>
+                    <span class="office-tag">${office.tag}</span>
+                  </div>
+                </div>
 
-            <div class="staff-list">
-              <div class="staff-card">
-                <div class="staff-details">
-                  <h4>Moravszki Gábor</h4>
-                  <p class="staff-role">ügyvezető igazgató, növényorvos</p>
-                  <a href="tel:+36303462848" class="staff-phone"><i class="fa-solid fa-phone"></i> +36 30 346 2848</a>
+                <div class="staff-list">
+                  ${members.length === 0 ? `
+                    <p style="color: var(--gray-500); font-size: 0.9rem; text-align: center !important; padding: 1rem 0;">
+                      Jelenleg nincs rögzített munkatárs ebben az irodában.
+                    </p>
+                  ` : members.map(person => {
+                    const cleanTel = (person.phone || '').replace(/[^\d+]/g, '');
+                    return `
+                      <div class="staff-card">
+                        <div class="staff-details">
+                          <h4>${person.name}</h4>
+                          <p class="staff-role">${person.role}</p>
+                          ${person.phone ? `
+                            <a href="tel:${cleanTel}" class="staff-phone"><i class="fa-solid fa-phone"></i> ${person.phone}</a>
+                          ` : ''}
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
                 </div>
               </div>
-
-              <div class="staff-card">
-                <div class="staff-details">
-                  <h4>Sápi Imre</h4>
-                  <p class="staff-role">irodavezető, szaktanácsadó</p>
-                  <a href="tel:+36305597376" class="staff-phone"><i class="fa-solid fa-phone"></i> +36 30 559 7376</a>
-                </div>
-              </div>
-
-              <div class="staff-card">
-                <div class="staff-details">
-                  <h4>Benke László</h4>
-                  <p class="staff-role">szaktanácsadó</p>
-                  <a href="tel:+36305571656" class="staff-phone"><i class="fa-solid fa-phone"></i> +36 30 557 1656</a>
-                </div>
-              </div>
-
-              <div class="staff-card">
-                <div class="staff-details">
-                  <h4>Mitruné Tóth Krisztina</h4>
-                  <p class="staff-role">pályázati szaktanácsadó</p>
-                  <a href="tel:+36302754911" class="staff-phone"><i class="fa-solid fa-phone"></i> +36 30 275 4911</a>
-                </div>
-              </div>
-
-              <div class="staff-card">
-                <div class="staff-details">
-                  <h4>Ungvári Enikő</h4>
-                  <p class="staff-role">szaktanácsadó</p>
-                  <a href="tel:+36307867133" class="staff-phone"><i class="fa-solid fa-phone"></i> +36 30 786 7133</a>
-                </div>
-              </div>
-
-              <div class="staff-card">
-                <div class="staff-details">
-                  <h4>Nagy Piroska</h4>
-                  <p class="staff-role">szaktanácsadó</p>
-                  <a href="tel:+36304402705" class="staff-phone"><i class="fa-solid fa-phone"></i> +36 30 440 2705</a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- KISVÁRDAI IRODA -->
-          <div class="office-card reveal-on-scroll fade-in-up">
-            <div class="office-header">
-              <div>
-                <h3>KISVÁRDAI IRODA</h3>
-                <span class="office-tag">Területi Iroda</span>
-              </div>
-            </div>
-
-            <div class="staff-list">
-              <div class="staff-card">
-                <div class="staff-details">
-                  <h4>Pokol Roland</h4>
-                  <p class="staff-role">növényorvos, szaktanácsadó</p>
-                  <a href="tel:+36304402725" class="staff-phone"><i class="fa-solid fa-phone"></i> +36 30 440 2725</a>
-                </div>
-              </div>
-
-              <div class="staff-card">
-                <div class="staff-details">
-                  <h4>Kosztyi Nikolett</h4>
-                  <p class="staff-role">szaktanácsadó</p>
-                  <a href="tel:+36303400525" class="staff-phone"><i class="fa-solid fa-phone"></i> +36 30 340 0525</a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- TARPAI IRODA -->
-          <div class="office-card reveal-on-scroll slide-in-right">
-            <div class="office-header">
-              <div>
-                <h3>TARPAI IRODA</h3>
-                <span class="office-tag">Területi Iroda</span>
-              </div>
-            </div>
-
-            <div class="staff-list">
-              <div class="staff-card">
-                <div class="staff-details">
-                  <h4>Sápi Imre</h4>
-                  <p class="staff-role">szaktanácsadó</p>
-                  <a href="tel:+36305597376" class="staff-phone"><i class="fa-solid fa-phone"></i> +36 30 559 7376</a>
-                </div>
-              </div>
-
-              <div class="staff-card">
-                <div class="staff-details">
-                  <h4>Benke László</h4>
-                  <p class="staff-role">szaktanácsadó</p>
-                  <a href="tel:+36305571656" class="staff-phone"><i class="fa-solid fa-phone"></i> +36 30 557 1656</a>
-                </div>
-              </div>
-            </div>
-          </div>
+            `;
+          }).join('')}
         </div>
       </div>
     </section>
   `;
 }
 
-export function renderContactPage() {
-  return renderContactSection();
+export function renderContactPage(staffList = INITIAL_STAFF) {
+  return renderContactSection(staffList);
 }

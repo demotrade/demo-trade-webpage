@@ -61,7 +61,7 @@ export function renderBlogPage(posts, activePostId, searchTerm = '', selectedCat
     );
   }
 
-  const postsPerPage = 4;
+  const postsPerPage = 6;
   const totalPages = Math.ceil(filteredPosts.length / postsPerPage) || 1;
   const validPage = Math.min(Math.max(1, currentPage), totalPages);
   const startIndex = (validPage - 1) * postsPerPage;

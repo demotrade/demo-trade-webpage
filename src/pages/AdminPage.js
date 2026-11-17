@@ -1,4 +1,5 @@
 import { normalizeRichContentHtml } from '../utils/contentNormalizer.js';
+import { INITIAL_STAFF, OFFICES_META } from '../data/initialStaff.js';
 
 export const CATEGORY_OPTIONS_BY_TYPE = {
   blog: [
@@ -55,7 +56,7 @@ export function renderPasswordEyeSvg(isVisible = false) {
   `;
 }
 
-export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeFilter = 'all') {
+export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeFilter = 'all', staffList = INITIAL_STAFF, editingStaffId = null) {
   if (!isLoggedIn) {
     return `
       <div class="container" style="padding-top: 5rem; padding-bottom: 6rem; max-width: 480px;">
@@ -98,6 +99,8 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
   const blogCount = posts.filter(p => !p.type || p.type === 'blog').length;
   const careerCount = posts.filter(p => p.type === 'career').length;
   const productCount = posts.filter(p => p.type === 'product').length;
+  const activeStaff = Array.isArray(staffList) && staffList.length > 0 ? staffList : INITIAL_STAFF;
+  const editingStaff = editingStaffId ? activeStaff.find(s => s.id === editingStaffId) : null;
 
   return `
     <div class="container" style="padding-top: 3rem; padding-bottom: 5rem; max-width: 1240px;">
@@ -108,10 +111,13 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
             <i class="fa-solid fa-sliders" style="color: #5ce685;"></i> DEMO-TRADE TARTALOMKEZELŐ PANEL
           </h1>
           <p style="color: var(--gray-300); font-size: 0.95rem;">
-            Itt hozhat létre és szerkeszthet Blog cikkeket, Álláshirdetéseket (Karrier), valamint Termékeket (pl. Gyümölcsfa oltványok).
+            Itt hozhat létre és szerkeszthet Blog cikkeket, Álláshirdetéseket, Termékeket, valamint a Munkatársak és Irodák elérhetőségeit.
           </p>
         </div>
         <div style="display: flex; gap: 0.8rem; flex-wrap: wrap;">
+          <button type="button" class="btn btn-primary" id="jump-to-staff-btn" style="padding: 0.65rem 1.2rem; font-size: 0.9rem;">
+            <i class="fa-solid fa-users-gear"></i> Munkatársak Kezelése (${activeStaff.length})
+          </button>
           <a href="/" target="_blank" class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.4); text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem;" title="Weboldal megtekintése új böngészőlapon">
             <i class="fa-solid fa-arrow-up-right-from-square"></i> Weboldal Megtekintése
           </a>
@@ -580,6 +586,126 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
               })()}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- ========================================================= -->
+      <!-- MUNKATÁRSAINK & IRODÁK KEZELÉSE SZEKCIÓ                   -->
+      <!-- ========================================================= -->
+      <div class="admin-card" id="admin-staff-section" style="margin-top: 3rem; padding: 2.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-bottom: 2px solid var(--primary-light); padding-bottom: 1rem; margin-bottom: 1.8rem;">
+          <div>
+            <h3 style="font-size: 1.5rem; margin: 0; display: flex; align-items: center; gap: 0.6rem;">
+              <i class="fa-solid fa-users-gear" style="color: var(--primary);"></i>
+              Munkatársaink &amp; Irodák Kezelése (${activeStaff.length} fő)
+            </h3>
+            <p style="color: var(--gray-600); font-size: 0.9rem; margin-top: 0.3rem; text-align: left !important;">
+              Itt adhat hozzá új munkatársat, módosíthatja a meglévők nevét, beosztását, telefonszámát vagy irodai besorolását. A változások azonnal megjelennek a Főoldalon, a Kapcsolat oldalon és az Impresszumban is.
+            </p>
+          </div>
+          <button type="button" class="btn btn-outline" id="reset-staff-btn" style="font-size: 0.85rem; padding: 0.55rem 1.1rem;">
+            <i class="fa-solid fa-rotate-left"></i> Alapértelmezett névsor visszaállítása
+          </button>
+        </div>
+
+        <!-- STAFF ADD / EDIT FORM -->
+        <form id="admin-staff-form" novalidate style="background: var(--gray-50); border: 1.5px solid ${editingStaff ? 'var(--primary)' : 'var(--gray-200)'}; border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 2.2rem;">
+          <input type="hidden" id="staff-id" value="${editingStaff ? editingStaff.id : ''}" />
+          <div style="font-weight: 800; color: var(--dark); font-size: 1.05rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fa-solid ${editingStaff ? 'fa-user-pen' : 'fa-user-plus'}" style="color: var(--primary);"></i>
+            ${editingStaff ? `Munkatárs adatainak szerkesztése: ${editingStaff.name}` : 'Új munkatárs felvétele az irodához'}
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.1fr 1.2fr 1.3fr 1.1fr auto; gap: 1rem; align-items: end;" class="admin-staff-form-grid">
+            <div class="form-group" style="margin: 0;">
+              <label for="staff-office" style="font-weight: 700;">Iroda *</label>
+              <select id="staff-office" class="form-control" style="cursor: pointer; background: #fff;" required>
+                ${OFFICES_META.map(off => `
+                  <option value="${off.id}" ${editingStaff && editingStaff.office === off.id ? 'selected' : ''}>
+                    ${off.title} (${off.tag})
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div class="form-group" style="margin: 0;">
+              <label for="staff-name" style="font-weight: 700;">Teljes Név *</label>
+              <input type="text" id="staff-name" class="form-control" style="background: #fff;" placeholder="Pl. Kovács János" value="${editingStaff ? editingStaff.name : ''}" required />
+            </div>
+
+            <div class="form-group" style="margin: 0;">
+              <label for="staff-role" style="font-weight: 700;">Beosztás / Feladatkör *</label>
+              <input type="text" id="staff-role" class="form-control" style="background: #fff;" placeholder="Pl. szaktanácsadó, növényorvos" value="${editingStaff ? editingStaff.role : 'szaktanácsadó'}" required />
+            </div>
+
+            <div class="form-group" style="margin: 0;">
+              <label for="staff-phone" style="font-weight: 700;">Telefonszám *</label>
+              <input type="text" id="staff-phone" class="form-control" style="background: #fff;" placeholder="Pl. +36 30 123 4567" value="${editingStaff ? editingStaff.phone : '+36 30 '}" required />
+            </div>
+
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="submit" class="btn btn-primary" style="padding: 0.8rem 1.3rem; white-space: nowrap;">
+                <i class="fa-solid ${editingStaff ? 'fa-floppy-disk' : 'fa-plus'}"></i>
+                ${editingStaff ? 'Mentés' : 'Hozzáadás'}
+              </button>
+              ${editingStaff ? `
+                <button type="button" class="btn btn-outline" id="cancel-staff-edit-btn" style="padding: 0.8rem 1rem; background: #fff;">
+                  Mégse
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        </form>
+
+        <!-- 3-COLUMN OFFICE STAFF CARDS OVERVIEW -->
+        <div class="offices-grid" style="margin-top: 0;">
+          ${OFFICES_META.map(office => {
+            const members = activeStaff.filter(m => m.office === office.id);
+            return `
+              <div class="office-card" style="padding: 1.5rem; background: #f8fafc;">
+                <div class="office-header" style="margin-bottom: 1rem; padding-bottom: 0.8rem; display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <h3 style="font-size: 1.1rem;">${office.title}</h3>
+                    <span class="office-tag">${office.tag} &bull; ${members.length} fő</span>
+                  </div>
+                </div>
+
+                <div class="staff-list" style="gap: 0.8rem;">
+                  ${members.length === 0 ? `
+                    <div style="text-align: center; color: var(--gray-500); font-size: 0.88rem; padding: 1.5rem 0.5rem; border: 1px dashed var(--gray-300); border-radius: 8px;">
+                      Nincs munkatárs ebben az irodában.
+                    </div>
+                  ` : members.map((person, idx) => `
+                    <div class="staff-card" style="background: #ffffff; padding: 0.9rem 1rem; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; ${editingStaffId === person.id ? 'border: 2px solid var(--primary); box-shadow: 0 0 0 3px var(--primary-glow);' : ''}">
+                      <div class="staff-details" style="min-width: 0; flex: 1;">
+                        <h4 style="font-size: 0.98rem;">${person.name}</h4>
+                        <p class="staff-role" style="font-size: 0.82rem; margin-bottom: 0.25rem;">${person.role}</p>
+                        <span class="staff-phone" style="font-size: 0.86rem;"><i class="fa-solid fa-phone"></i> ${person.phone}</span>
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 0.35rem; flex-shrink: 0;">
+                        <div style="display: flex; gap: 0.3rem; justify-content: flex-end;">
+                          <button type="button" class="action-btn move-staff-btn" data-id="${person.id}" data-dir="up" ${idx === 0 ? 'disabled' : ''} style="padding: 0.28rem 0.5rem; font-size: 0.75rem; background: var(--gray-100); border: 1px solid var(--gray-300); border-radius: 5px; ${idx === 0 ? 'opacity: 0.35; cursor: default;' : ''}" title="Mozgatás feljebb">
+                            <i class="fa-solid fa-arrow-up"></i>
+                          </button>
+                          <button type="button" class="action-btn move-staff-btn" data-id="${person.id}" data-dir="down" ${idx === members.length - 1 ? 'disabled' : ''} style="padding: 0.28rem 0.5rem; font-size: 0.75rem; background: var(--gray-100); border: 1px solid var(--gray-300); border-radius: 5px; ${idx === members.length - 1 ? 'opacity: 0.35; cursor: default;' : ''}" title="Mozgatás lejjebb">
+                            <i class="fa-solid fa-arrow-down"></i>
+                          </button>
+                        </div>
+                        <div style="display: flex; gap: 0.3rem; justify-content: flex-end;">
+                          <button type="button" class="action-btn action-btn-edit edit-staff-btn" data-id="${person.id}" style="padding: 0.32rem 0.55rem; font-size: 0.78rem;" title="Munkatárs szerkesztése">
+                            <i class="fa-solid fa-pen"></i>
+                          </button>
+                          <button type="button" class="action-btn action-btn-delete delete-staff-btn" data-id="${person.id}" style="padding: 0.32rem 0.55rem; font-size: 0.78rem;" title="Munkatárs törlése">
+                            <i class="fa-solid fa-trash"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
 
