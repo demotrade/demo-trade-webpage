@@ -72,7 +72,7 @@ export function renderAdminPage(posts, isLoggedIn, editingPostId = null, activeF
           <form id="admin-login-form" novalidate>
             <div class="form-group" style="text-align: left;">
               <label for="admin-email">E-mail cím</label>
-              <input type="email" id="admin-email" class="form-control" placeholder="Az Ön e-mail címe" value="${String(getRememberedAdminEmail()).replace(/"/g, '&quot;').replace(/</g, '&lt;')}" autocomplete="username" required />
+              <input type="email" id="admin-email" class="form-control" placeholder="admin@demotradekft.hu" value="${String(getRememberedAdminEmail()).replace(/"/g, '&quot;').replace(/</g, '&lt;')}" autocomplete="username" required />
             </div>
             <div class="form-group" style="text-align: left;">
               <label for="admin-password">Jelszó</label>

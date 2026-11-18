@@ -13,7 +13,7 @@
 
 UPDATE auth.users
 SET raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || '{"role": "admin"}'::jsonb
-WHERE email = 'admin@trade.hu';
+WHERE email = 'admin@demotradekft.hu';
 
 -- Ellenőrzés: ennek a lekérdezésnek 1 sort kell visszaadnia, role = admin értékkel
 SELECT id, email, raw_app_meta_data ->> 'role' AS role

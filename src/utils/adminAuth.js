@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient.js';
 
 // Az admin e-mail cím nem titok; az űrlapon előre kitölthető (a jelszó viszont soha nincs a kódban).
 export const ADMIN_EMAIL_HINT =
-  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_ADMIN_EMAIL) || '';
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_ADMIN_EMAIL) || 'admin@demotradekft.hu';
 const LAST_EMAIL_KEY = 'demotrade_admin_email';
 
 // FONTOS: ez csak a felület megjelenítését vezérli. A valódi védelmet az adatbázis (RLS)
