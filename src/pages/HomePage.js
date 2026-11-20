@@ -337,6 +337,18 @@ export function renderHomePage(posts, staffList) {
 
     <!-- CONTACT SECTION (At the bottom of Homepage) -->
     ${renderContactSection(staffList)}
+
+    <!-- KÖTELEZŐ ARCULATI ELEM (FŐOLDALI GÖRGETHETŐ / FIX LEBEGŐ INFÓBLOKK) -->
+    <aside class="floating-infoblokk-wrap" aria-label="Kötelező pályázati infóblokk">
+      <a href="/palyazatok" data-page="palyazatok" class="floating-infoblokk-link" title="Pályázatok és uniós támogatási adatok megtekintése">
+        <img 
+          src="/palyazatok/infoblokk_HU_RGB_szines_cropped.jpg" 
+          alt="Magyarország Kormánya és az Európai Unió - Széchenyi Terv Plusz / KAP infóblokk" 
+          class="floating-infoblokk-img"
+          loading="lazy"
+        />
+      </a>
+    </aside>
   `;
 }
 

@@ -9,6 +9,11 @@ export function renderFooter() {
               <img src="/demo-trade-logo.jpg" alt="Demo-Trade Kft." style="height: 50px; width: auto; background: white; padding: 4px 8px; border-radius: 8px;" />
             </div>
             <p style="font-size: 0.9rem; line-height: 1.6;">Akkreditált Uniós Szaktanácsadási Központ. Küldetésünk, hogy minél több termelőnek megkönnyítsük az agrár- és vidékfejlesztéshez kapcsolódó ügyintézését.</p>
+            <div class="footer-infoblokk">
+              <a href="/palyazatok" data-page="palyazatok" title="Pályázatok és uniós támogatások">
+                <img src="/palyazatok/infoblokk_HU_RGB_feher.png" alt="Széchenyi Terv Plusz – Magyarország Kormánya – Európai Unió" loading="lazy" />
+              </a>
+            </div>
           </div>
 
           <!-- NAV LINKS -->
@@ -21,6 +26,7 @@ export function renderFooter() {
               <li><a href="/termekek" data-page="products">Termékek</a></li>
               <li><a href="/karrier" data-page="career">Karrier</a></li>
               <li><a href="/hirek" data-page="blog">Blog &amp; Hírek</a></li>
+              <li><a href="/palyazatok" data-page="palyazatok">Pályázatok</a></li>
               <li><a href="/kapcsolat" data-page="home" data-section="kapcsolat">Kapcsolat</a></li>
               <li><a href="/adatkezeles" data-page="privacy" style="color: var(--gray-400);">Adatkezelési tájékoztató</a></li>
               <li><a href="/impresszum" data-page="impresszum" style="color: var(--gray-400);">Impresszum</a></li>

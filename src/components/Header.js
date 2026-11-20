@@ -15,9 +15,14 @@ export function renderHeader(activePage, searchValue = '') {
 
     <nav class="navbar">
       <div class="container navbar-container">
-        <a href="#" class="brand-logo" id="logo-btn">
-          <img src="/images/lap_logo.png" alt="Demo-Trade Kft. Logó" class="brand-logo-img" />
-        </a>
+        <div class="brand-group">
+          <a href="#" class="brand-logo" id="logo-btn">
+            <img src="/images/lap_logo.png" alt="Demo-Trade Kft. Logó" class="brand-logo-img" />
+          </a>
+          <a href="/palyazatok" data-page="palyazatok" class="brand-vte-link" title="Vidékfejlesztési Program / VTE">
+            <img src="/images/vte-logo.png" alt="VTE Logó" class="brand-vte-img" />
+          </a>
+        </div>
 
         <!-- DESKTOP NAV MENU -->
         <ul class="nav-menu" id="nav-menu">
@@ -35,6 +40,9 @@ export function renderHeader(activePage, searchValue = '') {
           </li>
           <li class="nav-item ${activePage === 'blog' ? 'active' : ''}">
             <button data-page="blog"><i class="fa-solid fa-newspaper"></i> Blog &amp; Hírek</button>
+          </li>
+          <li class="nav-item ${activePage === 'palyazatok' ? 'active' : ''}">
+            <button data-page="palyazatok"><i class="fa-solid fa-file-invoice-dollar"></i> Pályázatok</button>
           </li>
           <li class="nav-item">
             <button data-page="home" data-section="kapcsolat"><i class="fa-solid fa-address-book"></i> Kapcsolat</button>
@@ -61,7 +69,14 @@ export function renderHeader(activePage, searchValue = '') {
           </div>
 
           <button class="mobile-toggle" id="mobile-toggle" aria-label="Menü megnyitása">
-            <i class="fa-solid fa-bars" id="mobile-toggle-icon"></i>
+            <svg class="mobile-toggle-notch" viewBox="0 0 160 38" preserveAspectRatio="none" aria-hidden="true">
+              <path class="notch-fill" d="M 0,6 L 16,6 C 28,6 36,34 52,34 L 108,34 C 124,34 132,6 144,6 L 160,6 L 160,0 L 0,0 Z" />
+              <path class="notch-stroke" d="M 0,6 L 16,6 C 28,6 36,34 52,34 L 108,34 C 124,34 132,6 144,6 L 160,6" fill="none" />
+            </svg>
+            <span class="mobile-toggle-content">
+              <i class="fa-solid fa-bars" id="mobile-toggle-icon"></i>
+              <span class="mobile-toggle-text">MENÜ</span>
+            </span>
           </button>
         </div>
       </div>

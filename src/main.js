@@ -10,6 +10,7 @@ import { renderBlogPage } from './pages/BlogPage.js';
 import { renderContactPage } from './pages/ContactPage.js';
 import { renderCareerPage } from './pages/CareerPage.js';
 import { renderProductsPage } from './pages/ProductsPage.js';
+import { renderPalyazatokPage } from './pages/PalyazatokPage.js';
 import { renderAdminPage, CATEGORY_OPTIONS_BY_TYPE, renderPasswordEyeSvg } from './pages/AdminPage.js';
 import { renderImpresszumPage } from './pages/ImpresszumPage.js';
 import { renderPrivacyPage } from './pages/PrivacyPage.js';
@@ -403,6 +404,15 @@ function normalizeStr(str) {
 
 const STATIC_SEARCH_ITEMS = [
   {
+    id: 'palyazatok-kap-rd60',
+    category: 'Pályázatok',
+    icon: 'fa-solid fa-file-invoice-dollar',
+    title: 'Pályázatok - Egyedi tudásátadási szolgáltatások támogatása (KAP-RD60-2-24)',
+    text: 'Szakmai szaktanácsadás a Demo-Trade Kft. Területi Szaktanácsadási Központban. Kedvezményezett: DEMO-TRADE Kft. Támogatási összeg: 213,987 millió Ft.',
+    targetPage: 'palyazatok',
+    targetElementId: 'palyazat-kap-rd60'
+  },
+  {
     id: 'rolunk',
     category: 'Rólunk',
     icon: 'fa-solid fa-users',
@@ -627,6 +637,10 @@ function render() {
     case 'contact':
       mainContent = renderContactPage(state.staff);
       break;
+    case 'palyazatok':
+    case 'palyazat':
+      mainContent = renderPalyazatokPage();
+      break;
     case 'impresszum':
       mainContent = renderImpresszumPage(state.staff);
       break;
@@ -731,6 +745,10 @@ function updatePageSeoMeta() {
     title = 'Adatkezelési Tájékoztató (GDPR) | Demo-Trade Kft.';
     description = 'A Demo-Trade Kft. hivatalos adatkezelési szabályzata és adatvédelmi tájékoztatója.';
     canonicalUrl = `${baseUrl}/adatkezeles`;
+  } else if (state.activePage === 'palyazatok' || state.activePage === 'palyazat') {
+    title = 'Pályázatok & Támogatott Projektek (KAP-RD60-2-24) | Demo-Trade Kft.';
+    description = 'A Demo-Trade Kft. európai uniós támogatott agrárprojektjei: Szakmai szaktanácsadás a Területi Szaktanácsadási Központban (KAP-RD60-2-24, 213,987 millió Ft).';
+    canonicalUrl = `${baseUrl}/palyazatok`;
   }
 
   document.title = title;
@@ -976,6 +994,8 @@ function initHistoryState() {
       'hirek': 'blog',
       'contact': 'contact',
       'kapcsolat': 'contact',
+      'palyazatok': 'palyazatok',
+      'palyazat': 'palyazatok',
       'impresszum': 'impresszum',
       'privacy': 'privacy',
       'adatkezeles': 'privacy',
@@ -1030,6 +1050,8 @@ function initHistoryState() {
     'hirek': 'blog',
     'contact': 'contact',
     'kapcsolat': 'contact',
+    'palyazatok': 'palyazatok',
+    'palyazat': 'palyazatok',
     'impresszum': 'impresszum',
     'privacy': 'privacy',
     'adatkezeles': 'privacy',
